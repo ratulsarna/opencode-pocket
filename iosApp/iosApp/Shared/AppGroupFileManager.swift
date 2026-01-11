@@ -4,11 +4,17 @@ import Foundation
 final class AppGroupFileManager {
     static let shared = AppGroupFileManager()
 
-    // IMPORTANT: Must match App Group ID in:
-    // - iosApp/iosApp/iosApp.entitlements
-    // - iosApp/OCMobileShareExtension/OCMobileShareExtension.entitlements
-    // - composeApp/src/iosMain/.../ShareExtensionBridge.kt
-    private let appGroupIdentifier = "group.com.ratulsarna.ocmobile"
+    private let appGroupIdentifier: String = {
+        let key = "OC_APP_GROUP_ID"
+        let configured = Bundle.main.object(forInfoDictionaryKey: key) as? String
+        let value = (configured ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if !value.isEmpty {
+            return value
+        }
+
+        return "group.com.example.opencodepocket"
+    }()
     private let sharesDirectoryName = "Shares"
 
     private init() {}

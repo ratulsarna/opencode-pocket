@@ -380,6 +380,8 @@
 /* Begin XCBuildConfiguration section */
 		28219EAF84054830AC91F5D3 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReferenceAnchor = 43D1CE142227E656E13BE113 /* Configuration */;
+			baseConfigurationReferenceRelativePath = Config.xcconfig;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_IDENTITY = "Apple Development";
@@ -394,7 +396,7 @@
 					"@loader_path/Frameworks",
 					"@loader_path/../Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.ratulsarna.ocmobile.iosAppTests;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(TESTS_BUNDLE_IDENTIFIER)";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.0;
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/OpenCodePocket.app/OpenCodePocket";
@@ -403,6 +405,8 @@
 		};
 		2A497ABCAC9E496B9990982B /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReferenceAnchor = 43D1CE142227E656E13BE113 /* Configuration */;
+			baseConfigurationReferenceRelativePath = Config.xcconfig;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_IDENTITY = "Apple Development";
@@ -416,7 +420,7 @@
 					"@loader_path/Frameworks",
 					"@loader_path/../Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.ratulsarna.ocmobile.iosAppTests;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(TESTS_BUNDLE_IDENTIFIER)";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.0;
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/OpenCodePocket.app/OpenCodePocket";
@@ -425,6 +429,8 @@
 		};
 		46EAA4BD2EF1FA760031A30F /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReferenceAnchor = 43D1CE142227E656E13BE113 /* Configuration */;
+			baseConfigurationReferenceRelativePath = Config.xcconfig;
 			buildSettings = {
 				ARCHS = arm64;
 				CODE_SIGN_ENTITLEMENTS = OCMobileShareExtension/OCMobileShareExtension.entitlements;
@@ -449,7 +455,7 @@
 					"-framework",
 					ComposeApp,
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.ratulsarna.ocmobile.OpenCodePocket.OCMobileShareExtension;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(SHARE_EXTENSION_BUNDLE_IDENTIFIER)";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -463,6 +469,8 @@
 		};
 		46EAA4BE2EF1FA760031A30F /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReferenceAnchor = 43D1CE142227E656E13BE113 /* Configuration */;
+			baseConfigurationReferenceRelativePath = Config.xcconfig;
 			buildSettings = {
 				ARCHS = arm64;
 				CODE_SIGN_ENTITLEMENTS = OCMobileShareExtension/OCMobileShareExtension.entitlements;
@@ -487,7 +495,7 @@
 					"-framework",
 					ComposeApp,
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.ratulsarna.ocmobile.OpenCodePocket.OCMobileShareExtension;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(SHARE_EXTENSION_BUNDLE_IDENTIFIER)";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;

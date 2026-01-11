@@ -55,7 +55,10 @@ Choose a connection mode when prompted:
 If you’re running on a real iPhone, set your Team in Xcode:
 
 - Option A (recommended): Xcode → target `iosApp` → Signing & Capabilities → select your Team
-- Option B: set `TEAM_ID=` in `iosApp/Configuration/Config.xcconfig`
+- Option B: edit `iosApp/Configuration/Config.xcconfig` and set:
+  - `TEAM_ID=` (your Apple Developer Team ID)
+  - `BUNDLE_ID_PREFIX=` (your reverse-DNS prefix, e.g. `com.yourname`)
+  - `APP_GROUP_IDENTIFIER=` (must match the App Group you create in Apple Developer)
 
 In the app:
 

@@ -65,7 +65,7 @@ class ShareViewController: UIViewController {
         viewModel.state = .loading
 
         let group = DispatchGroup()
-        let extractionQueue = DispatchQueue(label: "com.ratulsarna.ocmobile.extraction")
+        let extractionQueue = DispatchQueue(label: "com.opencodepocket.extraction")
         var extractedFiles: [ExtractedFile] = []
         var extractedText: String = ""
 

@@ -16,6 +16,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import platform.Foundation.NSData
+import platform.Foundation.NSBundle
 import platform.Foundation.NSFileManager
 import platform.Foundation.NSString
 import platform.Foundation.NSUTF8StringEncoding
@@ -35,11 +36,8 @@ fun consumePendingShare() = ShareExtensionBridge.consumePendingShare()
  * Reads manifest and files from the App Group container.
  */
 object ShareExtensionBridge {
-    // IMPORTANT: Must match App Group ID in:
-    // - iosApp/iosApp/iosApp.entitlements
-    // - iosApp/OCMobileShareExtension/OCMobileShareExtension.entitlements
-    // - iosApp/iosApp/Shared/AppGroupFileManager.swift
-    private const val APP_GROUP_ID = "group.com.ratulsarna.ocmobile"
+    private const val APP_GROUP_INFO_PLIST_KEY = "OC_APP_GROUP_ID"
+    private const val DEFAULT_APP_GROUP_ID = "group.com.example.opencodepocket"
     private const val MANIFEST_FILENAME = "SharedManifest.json"
 
     // Dedicated scope for managed coroutines
@@ -68,9 +66,15 @@ object ShareExtensionBridge {
 
     @OptIn(ExperimentalForeignApi::class, ExperimentalUuidApi::class)
     private fun consumePendingShareInternal() {
+        val appGroupId =
+            (NSBundle.mainBundle.objectForInfoDictionaryKey(APP_GROUP_INFO_PLIST_KEY) as? String)
+                ?.trim()
+                ?.takeIf { it.isNotEmpty() }
+                ?: DEFAULT_APP_GROUP_ID
+
         // 1. Get App Group container URL
         val containerUrl = NSFileManager.defaultManager
-            .containerURLForSecurityApplicationGroupIdentifier(APP_GROUP_ID)
+            .containerURLForSecurityApplicationGroupIdentifier(appGroupId)
             ?: return
 
         val containerPath = containerUrl.path ?: return
