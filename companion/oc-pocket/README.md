@@ -6,8 +6,6 @@ This is a macOS companion CLI for `opencode-pocket` that provides:
 - An auth token + pairing payload (QR + copy/paste)
 - A per-user `launchd` agent to keep the backend running
 
-For the implementation plan, see `.ai/plans/execplan-oc-pocket-companion-cli-macos.md`.
-
 ## Local dev
 
 From repo root:
