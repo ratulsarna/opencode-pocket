@@ -1,0 +1,67 @@
+name: Release oc-pocket
+
+on:
+  push:
+    tags:
+      - "oc-pocket-v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to build (e.g. oc-pocket-v0.1.0)"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build and publish (macOS)
+    # GitHub-hosted runners are billed for private repos. Allow manual release builds while private,
+    # and run automatically on tag pushes once the repo is public.
+    if: ${{ github.event_name == 'workflow_dispatch' || !github.event.repository.private }}
+    runs-on: macos-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: companion/oc-pocket/go.mod
+          cache: true
+
+      - name: Build universal binary
+        run: |
+          set -euo pipefail
+          cd companion/oc-pocket
+
+          ref_name="${GITHUB_REF_NAME}"
+          if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ]; then
+            ref_name="${{ inputs.tag }}"
+          fi
+
+          version="${ref_name#oc-pocket-}"
+
+          rm -rf dist
+          mkdir -p dist
+
+          CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -trimpath -ldflags "-s -w" -o dist/oc-pocket-darwin-arm64 .
+          CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -trimpath -ldflags "-s -w" -o dist/oc-pocket-darwin-amd64 .
+
+          lipo -create -output dist/oc-pocket dist/oc-pocket-darwin-arm64 dist/oc-pocket-darwin-amd64
+          chmod +x dist/oc-pocket
+
+          tar -C dist -czf "dist/oc-pocket-${version}-darwin-universal.tar.gz" oc-pocket
+          # Write checksum with a filename relative to the download directory (no "dist/" prefix),
+          # so users can run: shasum -a 256 -c oc-pocket-<version>-darwin-universal.tar.gz.sha256
+          (cd dist && shasum -a 256 "oc-pocket-${version}-darwin-universal.tar.gz" > "oc-pocket-${version}-darwin-universal.tar.gz.sha256")
+
+      - name: Publish release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+          files: |
+            companion/oc-pocket/dist/oc-pocket-*-darwin-universal.tar.gz
+            companion/oc-pocket/dist/oc-pocket-*-darwin-universal.tar.gz.sha256

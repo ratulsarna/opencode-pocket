@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CADisableMinimumFrameDurationOnPhone</key>
+	<true/>
+	<key>CFBundleDisplayName</key>
+	<string>OpenCode Pocket</string>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>OpenCode Pocket needs access to your photos to attach images to messages.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>OpenCode Pocket uses the camera to scan a QR code and connect to your Mac.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>OpenCode Pocket needs access to your local network to connect to OpenCode running on your Mac.</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.ratulsarna.ocmobile</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>oc-pocket</string>
+			</array>
+		</dict>
+	</array>
+</dict>
+</plist>

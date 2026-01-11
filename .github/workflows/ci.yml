@@ -1,0 +1,78 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  kmp:
+    name: KMP (tests + iOS compile)
+    # GitHub-hosted runners are billed for private repos; if billing is disabled/blocked,
+    # jobs never start. Keep CI triggers enabled but skip all jobs until the repo is public.
+    if: ${{ !github.event.repository.private }}
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: KMP tests + iOS compile
+        run: |
+          ./gradlew :composeApp:jvmTest :composeApp:compileKotlinIosSimulatorArm64
+
+  ios:
+    name: iOS (simulator build)
+    if: ${{ !github.event.repository.private }}
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Xcode version
+        run: xcodebuild -version
+
+      - name: Build (iOS Simulator)
+        run: |
+          xcodebuild \
+            -project iosApp/iosApp.xcodeproj \
+            -scheme iosApp \
+            -configuration Debug \
+            -destination 'generic/platform=iOS Simulator' \
+            build
+
+  oc-pocket:
+    name: oc-pocket (go test)
+    if: ${{ !github.event.repository.private }}
+    runs-on: macos-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: companion/oc-pocket/go.mod
+          cache: true
+
+      - name: Go tests
+        run: |
+          cd companion/oc-pocket
+          go test ./...
