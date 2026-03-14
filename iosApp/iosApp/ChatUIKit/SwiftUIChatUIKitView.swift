@@ -51,11 +51,11 @@ struct SwiftUIChatUIKitView: View {
                     VStack(spacing: 0) {
                         toolbarOverlay(state: state, safeTopInset: proxy.safeAreaInsets.top)
                         Spacer(minLength: 0)
-                        composerOverlay(state: state, safeBottomInset: max(proxy.safeAreaInsets.bottom, 10))
+                        composerOverlay(state: state, safeBottomInset: keyboardAwareBottomInset(proxy.safeAreaInsets.bottom))
                     }
                 }
             }
-            .ignoresSafeArea()
+            .ignoresSafeArea(.container)
         }
         .toolbar(.hidden, for: .navigationBar)
         .onAppear {
@@ -97,6 +97,13 @@ struct SwiftUIChatUIKitView: View {
         }
     }
 
+    private func keyboardAwareBottomInset(_ safeAreaBottom: CGFloat) -> CGFloat {
+        if safeAreaBottom > 80 {
+            return 6
+        }
+        return max(safeAreaBottom, 10)
+    }
+
     @ViewBuilder
     private func toolbarOverlay(state: ChatUiState, safeTopInset: CGFloat) -> some View {
         ChatToolbarGlassView(
@@ -109,9 +116,9 @@ struct SwiftUIChatUIKitView: View {
             onRevert: viewModel.revertToLastGood
         )
         .padding(.horizontal, 12)
-        .padding(.top, safeTopInset + 6)
-        .padding(.bottom, 8)
-        .chatGlassHostRegion(cornerRadius: 34, tint: Color.white.opacity(0.10))
+        .padding(.top, safeTopInset + 2)
+        .padding(.bottom, 3)
+        .chatGlassHostRegion(cornerRadius: 34, tint: .clear)
         .background(HeightReader(height: $topOverlayHeight))
     }
 
@@ -146,9 +153,9 @@ struct SwiftUIChatUIKitView: View {
             )
         }
         .padding(.horizontal, 12)
-        .padding(.top, 8)
+        .padding(.top, 4)
+        .chatGlassHostRegion(cornerRadius: 36, tint: .clear)
         .padding(.bottom, safeBottomInset)
-        .chatGlassHostRegion(cornerRadius: 36, tint: Color.white.opacity(0.08))
         .background(HeightReader(height: $bottomOverlayHeight))
     }
 }

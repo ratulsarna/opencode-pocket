@@ -75,14 +75,14 @@ struct ChatToolbarGlassView: View {
                             }
                         }
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.top, 14)
-                    .padding(.bottom, showProcessingBar ? 10 : 14)
+                    .padding(.horizontal, 14)
+                    .padding(.top, 9)
+                    .padding(.bottom, showProcessingBar ? 7 : 9)
 
                     if showProcessingBar {
                         ChatToolbarProcessingBar()
-                            .padding(.horizontal, 16)
-                            .padding(.bottom, 14)
+                            .padding(.horizontal, 14)
+                            .padding(.bottom, 9)
                     }
                 }
 
@@ -232,8 +232,8 @@ struct ChatComposerCardView: View {
                     .frame(height: max(inputHeight, 24))
                 }
                 .padding(.horizontal, 16)
-                .padding(.top, state.pendingAttachments.isEmpty ? 16 : 8)
-                .padding(.bottom, 14)
+                .padding(.top, state.pendingAttachments.isEmpty ? 12 : 6)
+                .padding(.bottom, 10)
 
                 Divider()
                     .overlay(Color.primary.opacity(0.08))
@@ -309,11 +309,11 @@ struct ChatComposerCardView: View {
                     .disabled(!showStopButton && !canSend)
                 }
                 .padding(.horizontal, 16)
-                .padding(.top, 10)
-                .padding(.bottom, 12)
+                .padding(.top, 8)
+                .padding(.bottom, 10)
             }
         }
-        }
+    }
     }
 
     private func displayName(path: String) -> String {
@@ -328,24 +328,14 @@ private struct ChatToolbarIconButton<Label: View>: View {
 
     var body: some View {
         Group {
-            if #available(iOS 26, *) {
-                Button(action: action) {
-                    label()
-                        .font(.system(size: 14, weight: .medium))
-                        .frame(width: 32, height: 32)
-                }
-                .buttonStyle(.glass)
-            } else {
-                Button(action: action) {
-                    label()
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(.primary)
-                        .frame(width: 32, height: 32)
-                        .background(.thinMaterial, in: Circle())
-                        .overlay(Circle().strokeBorder(Color.primary.opacity(0.06), lineWidth: 1))
-                }
-                .buttonStyle(.plain)
+            Button(action: action) {
+                label()
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(.primary)
+                    .frame(width: 34, height: 34)
+                    .chatGlassCircle(tint: Color.white.opacity(0.01))
             }
+            .buttonStyle(.plain)
         }
     }
 }
@@ -621,16 +611,13 @@ extension View {
     }
 
     @ViewBuilder
-    func chatGlassHostRegion(cornerRadius: CGFloat, tint: Color = Color.white.opacity(0.06)) -> some View {
+    func chatGlassHostRegion(cornerRadius: CGFloat, tint: Color = .clear) -> some View {
         if #available(iOS 26, *) {
             self
                 .glassEffect(.regular.tint(tint), in: .rect(cornerRadius: cornerRadius))
-                .overlay(
-                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                        .strokeBorder(Color.white.opacity(0.22), lineWidth: 0.8)
-                )
         } else {
-            self.chatGlassCard(cornerRadius: cornerRadius, tint: tint)
+            self
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
         }
     }
 
