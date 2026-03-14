@@ -80,18 +80,14 @@ struct SwiftUIChatUIKitView: View {
         }
     }
 
-    private func addPastedImages(_ imageDataItems: [Data]) {
-        let maxFiles = Int(AttachmentLimits.shared.MAX_FILES_PER_MESSAGE)
-        let currentCount = latestUiState?.pendingAttachments.count ?? 0
-        let remaining = max(0, maxFiles - currentCount)
-        guard remaining > 0 else { return }
+    private func addPastedImages(_ imageDataItems: [ChatComposerPastedImagePayload]) {
+        guard !imageDataItems.isEmpty else { return }
 
-        for data in imageDataItems.prefix(remaining) {
-            let uuid = String(UUID().uuidString.prefix(8))
+        for item in imageDataItems {
             let attachment = ChatAttachmentBuilder.makeAttachment(
-                filename: "paste_\(uuid).jpg",
-                mimeType: "image/jpeg",
-                data: data
+                filename: item.filename,
+                mimeType: item.mimeType,
+                data: item.data
             )
             viewModel.addAttachment(attachment: attachment)
         }

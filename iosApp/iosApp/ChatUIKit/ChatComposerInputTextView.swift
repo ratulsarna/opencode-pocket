@@ -1,6 +1,12 @@
 import SwiftUI
 import UIKit
 
+struct ChatComposerPastedImagePayload {
+    let filename: String
+    let mimeType: String
+    let data: Data
+}
+
 struct ChatComposerInputTextView: UIViewRepresentable {
     let text: String
     let cursorPosition: Int
@@ -8,7 +14,7 @@ struct ChatComposerInputTextView: UIViewRepresentable {
     let isEditable: Bool
     @Binding var dynamicHeight: CGFloat
     let onTextAndCursorChange: (String, Int) -> Void
-    let onPasteImageData: ([Data]) -> Void
+    let onPasteImageData: ([ChatComposerPastedImagePayload]) -> Void
 
     private let minVisibleLines: CGFloat = 1
     private let maxVisibleLines: CGFloat = 6
@@ -212,7 +218,22 @@ struct ChatComposerInputTextView: UIViewRepresentable {
 }
 
 final class ChatComposerPasteInterceptingTextView: UITextView {
-    var onPasteImageData: (([Data]) -> Void)?
+    var onPasteImageData: (([ChatComposerPastedImagePayload]) -> Void)?
+
+    private struct PasteboardImageRepresentation {
+        let pasteboardType: String
+        let mimeType: String
+        let fileExtension: String
+    }
+
+    private static let preferredRepresentations: [PasteboardImageRepresentation] = [
+        .init(pasteboardType: "public.png", mimeType: "image/png", fileExtension: "png"),
+        .init(pasteboardType: "public.webp", mimeType: "image/webp", fileExtension: "webp"),
+        .init(pasteboardType: "com.compuserve.gif", mimeType: "image/gif", fileExtension: "gif"),
+        .init(pasteboardType: "public.heic", mimeType: "image/heic", fileExtension: "heic"),
+        .init(pasteboardType: "public.heif", mimeType: "image/heif", fileExtension: "heif"),
+        .init(pasteboardType: "public.jpeg", mimeType: "image/jpeg", fileExtension: "jpg"),
+    ]
 
     override var intrinsicContentSize: CGSize {
         CGSize(width: UIView.noIntrinsicMetric, height: super.intrinsicContentSize.height)
@@ -228,9 +249,9 @@ final class ChatComposerPasteInterceptingTextView: UITextView {
 
     override func paste(_ sender: Any?) {
         let pasteboard = UIPasteboard.general
-        let imageDataItems = imageDataFromPasteboard(pasteboard)
-        if !imageDataItems.isEmpty {
-            onPasteImageData?(imageDataItems)
+        let imageItems = imagePayloadsFromPasteboard(pasteboard)
+        if !imageItems.isEmpty {
+            onPasteImageData?(imageItems)
             if pasteboard.hasStrings {
                 super.paste(sender)
             }
@@ -239,40 +260,88 @@ final class ChatComposerPasteInterceptingTextView: UITextView {
         super.paste(sender)
     }
 
-    private static let maxIntakeDimension: CGFloat = 1600
-    private static let intakeCompressionQuality: CGFloat = 0.8
-
-    private func imageDataFromPasteboard(_ pasteboard: UIPasteboard) -> [Data] {
-        var imageDataItems: [Data] = []
+    private func imagePayloadsFromPasteboard(_ pasteboard: UIPasteboard) -> [ChatComposerPastedImagePayload] {
+        let directItems = pasteboard.items.enumerated().compactMap { index, item in
+            Self.directImagePayload(from: item, index: index)
+        }
+        if !directItems.isEmpty {
+            return directItems
+        }
 
         if let images = pasteboard.images, !images.isEmpty {
-            imageDataItems = images.compactMap { Self.downscaledJPEGData(from: $0) }
-        } else if let image = pasteboard.image {
-            if let data = Self.downscaledJPEGData(from: image) {
-                imageDataItems = [data]
+            return images.enumerated().compactMap { index, image in
+                Self.fallbackPayload(from: image, index: index)
             }
         }
 
-        return imageDataItems
+        if let image = pasteboard.image, let payload = Self.fallbackPayload(from: image, index: 0) {
+            return [payload]
+        }
+
+        return []
     }
 
-    private static func downscaledJPEGData(from image: UIImage) -> Data? {
-        let size = image.size
-        guard size.width > 0, size.height > 0 else { return nil }
+    private static func directImagePayload(
+        from item: [String: Any],
+        index: Int
+    ) -> ChatComposerPastedImagePayload? {
+        for representation in preferredRepresentations {
+            guard let rawValue = item[representation.pasteboardType] else { continue }
+            guard let data = data(from: rawValue), !data.isEmpty else { continue }
 
-        let longestSide = max(size.width, size.height)
-        let scale = min(1, maxIntakeDimension / longestSide)
-
-        if scale < 1 {
-            let target = CGSize(width: floor(size.width * scale), height: floor(size.height * scale))
-            let format = UIGraphicsImageRendererFormat.default()
-            format.scale = 1
-            let resized = UIGraphicsImageRenderer(size: target, format: format).image { _ in
-                image.draw(in: CGRect(origin: .zero, size: target))
-            }
-            return resized.jpegData(compressionQuality: intakeCompressionQuality)
+            let token = String(UUID().uuidString.prefix(8))
+            return ChatComposerPastedImagePayload(
+                filename: "paste_\(token)_\(index).\(representation.fileExtension)",
+                mimeType: representation.mimeType,
+                data: data
+            )
         }
 
-        return image.jpegData(compressionQuality: intakeCompressionQuality)
+        if let image = item.values.compactMap({ $0 as? UIImage }).first {
+            return fallbackPayload(from: image, index: index)
+        }
+
+        return nil
+    }
+
+    private static func fallbackPayload(from image: UIImage, index: Int) -> ChatComposerPastedImagePayload? {
+        let token = String(UUID().uuidString.prefix(8))
+
+        if image.hasAlphaChannel, let pngData = image.pngData() {
+            return ChatComposerPastedImagePayload(
+                filename: "paste_\(token)_\(index).png",
+                mimeType: "image/png",
+                data: pngData
+            )
+        }
+
+        guard let jpegData = image.jpegData(compressionQuality: 0.9) else { return nil }
+        return ChatComposerPastedImagePayload(
+            filename: "paste_\(token)_\(index).jpg",
+            mimeType: "image/jpeg",
+            data: jpegData
+        )
+    }
+
+    private static func data(from rawValue: Any) -> Data? {
+        if let data = rawValue as? Data {
+            return data
+        }
+        if let nsData = rawValue as? NSData {
+            return Data(referencing: nsData)
+        }
+        return nil
+    }
+}
+
+private extension UIImage {
+    var hasAlphaChannel: Bool {
+        guard let alphaInfo = cgImage?.alphaInfo else { return true }
+        switch alphaInfo {
+        case .first, .last, .premultipliedFirst, .premultipliedLast:
+            return true
+        default:
+            return false
+        }
     }
 }

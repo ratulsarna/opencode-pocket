@@ -117,7 +117,7 @@ struct ChatComposerCardView: View {
     let onSend: () -> Void
     let onAbort: () -> Void
     let onSelectThinkingVariant: (String?) -> Void
-    let onPasteImageData: ([Data]) -> Void
+    let onPasteImageData: ([ChatComposerPastedImagePayload]) -> Void
 
     @State private var inputHeight: CGFloat = 24
     @State private var isInputFocused = false
@@ -246,7 +246,7 @@ struct ChatComposerCardView: View {
                         Button("Files", systemImage: "paperclip", action: onPickFiles)
                             .disabled(!canAddAttachments)
                         Button("Paste from Clipboard", systemImage: "doc.on.clipboard", action: onAddFromClipboard)
-                            .disabled(!canAddAttachments || !state.hasClipboardImage)
+                            .disabled(!canAddAttachments)
                     } label: {
                         Image(systemName: "plus")
                             .font(.system(size: 14, weight: .medium))

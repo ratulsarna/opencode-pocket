@@ -877,15 +877,60 @@ final class ChatViewController: UIViewController {
     }
 
     private func applyChromeInsets() {
+        let previousInsets = collectionView.contentInset
+        let previousOffsetY = collectionView.contentOffset.y
+        let shouldPreserveBottomAnchor =
+            isPinnedToBottom &&
+            !collectionView.isDragging &&
+            !collectionView.isDecelerating
+
         let insets = UIEdgeInsets(
             top: topChromeInset,
             left: 0,
             bottom: bottomChromeInset,
             right: 0
         )
+
+        let insetsChanged =
+            abs(previousInsets.top - insets.top) > 0.5 ||
+            abs(previousInsets.bottom - insets.bottom) > 0.5
+        let topInsetDelta = insets.top - previousInsets.top
+
         collectionView.contentInset = insets
         collectionView.scrollIndicatorInsets = insets
         scrollToBottomButtonBottomConstraint?.constant = -(max(16, bottomChromeInset + 12))
+
+        guard insetsChanged else { return }
+
+        if shouldPreserveBottomAnchor {
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                guard self.isPinnedToBottom else { return }
+                guard !self.collectionView.isDragging, !self.collectionView.isDecelerating else { return }
+                self.scrollToBottom(animated: false)
+            }
+            return
+        }
+
+        guard abs(topInsetDelta) > 0.5 else { return }
+
+        let targetOffsetY = clampedContentOffsetY(for: previousOffsetY - topInsetDelta)
+        guard abs(collectionView.contentOffset.y - targetOffsetY) > 0.5 else { return }
+
+        collectionView.setContentOffset(
+            CGPoint(x: collectionView.contentOffset.x, y: targetOffsetY),
+            animated: false
+        )
+    }
+
+    private func clampedContentOffsetY(for proposedOffsetY: CGFloat) -> CGFloat {
+        let adjustedInsets = collectionView.adjustedContentInset
+        let minOffsetY = -adjustedInsets.top
+        let maxOffsetY = max(
+            minOffsetY,
+            collectionView.contentSize.height - collectionView.bounds.height + adjustedInsets.bottom
+        )
+        return min(max(proposedOffsetY, minOffsetY), maxOffsetY)
     }
 }
 
@@ -1021,9 +1066,14 @@ private final class ChatCollectionBackgroundStatusView: UIView {
 
 extension ChatViewController: UICollectionViewDelegate {
     func scrollViewDidScroll(_ scrollView: UIScrollView) {
+        let adjustedInsets = scrollView.adjustedContentInset
+        let visibleViewportHeight = max(
+            0,
+            scrollView.bounds.height - adjustedInsets.top - adjustedInsets.bottom
+        )
         let metrics = ChatAutoScrollPolicy.ScrollMetrics(
-            contentOffsetY: Double(scrollView.contentOffset.y),
-            viewportHeight: Double(scrollView.bounds.height),
+            contentOffsetY: Double(scrollView.contentOffset.y + adjustedInsets.top),
+            viewportHeight: Double(visibleViewportHeight),
             contentHeight: Double(scrollView.contentSize.height)
         )
         let pinned = autoScrollPolicy.isPinnedToBottom(metrics: metrics)
