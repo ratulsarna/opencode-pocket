@@ -74,6 +74,22 @@ interface OpenCodeApi {
     suspend fun getProviders(): ProviderListResponse
 
     /**
+     * Get configured providers with their models.
+     *
+     * Newer OpenCode versions expose connected providers from `GET /config/providers`.
+     * Older servers only expose `GET /provider`, so the default implementation derives the
+     * connected subset from that legacy response.
+     */
+    suspend fun getConfiguredProviders(): ConfigProvidersResponse {
+        val response = getProviders()
+        val connectedIds = response.connected.toSet()
+        return ConfigProvidersResponse(
+            providers = response.all.filter { it.id in connectedIds },
+            default = response.default.filterKeys { it in connectedIds }
+        )
+    }
+
+    /**
      * Get the server configuration, including the default model.
      */
     suspend fun getConfig(): ConfigResponse

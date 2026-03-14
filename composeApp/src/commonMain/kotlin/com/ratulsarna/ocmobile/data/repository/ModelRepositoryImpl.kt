@@ -21,12 +21,9 @@ class ModelRepositoryImpl(
 
     override suspend fun getConnectedProviders(): Result<List<Provider>> {
         return runCatching {
-            val response = api.getProviders()
-            val connectedIds = response.connected.toSet()
+            val response = api.getConfiguredProviders()
 
-            // Filter to only connected providers and map to domain models
-            val providers = response.all
-                .filter { it.id in connectedIds }
+            val providers = response.providers
                 .map { it.toDomain() }
                 .filter { it.models.isNotEmpty() }
                 .sortedBy { it.name }

@@ -14,6 +14,15 @@ data class ProviderListResponse(
 )
 
 /**
+ * Response from GET /config/providers endpoint.
+ */
+@Serializable
+data class ConfigProvidersResponse(
+    val providers: List<ProviderDto>,
+    val default: Map<String, String> = emptyMap()
+)
+
+/**
  * DTO for provider data from the API.
  */
 @Serializable

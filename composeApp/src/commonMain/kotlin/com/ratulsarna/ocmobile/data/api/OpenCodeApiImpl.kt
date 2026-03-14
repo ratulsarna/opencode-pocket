@@ -5,6 +5,7 @@ import com.ratulsarna.ocmobile.util.OcMobileLog
 import io.ktor.client.*
 import kotlin.time.Clock
 import io.ktor.client.call.*
+import io.ktor.client.plugins.ClientRequestException
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.timeout
@@ -174,6 +175,18 @@ class OpenCodeApiImpl(
 
     override suspend fun getProviders(): ProviderListResponse {
         return httpClient.get("$baseUrl/provider").body()
+    }
+
+    override suspend fun getConfiguredProviders(): ConfigProvidersResponse {
+        return try {
+            httpClient.get("$baseUrl/config/providers").body()
+        } catch (error: ClientRequestException) {
+            if (error.response.status == HttpStatusCode.NotFound) {
+                super<OpenCodeApi>.getConfiguredProviders()
+            } else {
+                throw error
+            }
+        }
     }
 
     override suspend fun getConfig(): ConfigResponse {
