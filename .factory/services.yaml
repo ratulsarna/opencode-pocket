@@ -1,0 +1,9 @@
+commands:
+  install: ./gradlew --version
+  test: ./gradlew --max-workers=8 :composeApp:jvmTest
+  typecheck: ./gradlew --max-workers=8 :composeApp:compileKotlinIosSimulatorArm64
+  build: xcodebuild -project iosApp/iosApp.xcodeproj -scheme iosApp -configuration Debug -destination 'generic/platform=iOS Simulator' build
+  ios_build_sim: xcodebuild -project iosApp/iosApp.xcodeproj -scheme iosApp -configuration Debug -destination 'generic/platform=iOS Simulator' build
+  ios_compile_shared: ./gradlew --max-workers=8 :composeApp:compileKotlinIosSimulatorArm64
+
+services: {}
