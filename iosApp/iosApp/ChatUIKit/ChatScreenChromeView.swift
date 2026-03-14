@@ -214,7 +214,7 @@ struct ChatComposerCardView: View {
 
                 ZStack(alignment: .topLeading) {
                     if state.inputText.isEmpty {
-                        Text("Ask OpenCode anything, @ for files, / for commands")
+                        Text("Ask anything...")
                             .font(.body)
                             .foregroundStyle(Color(.placeholderText))
                             .allowsHitTesting(false)

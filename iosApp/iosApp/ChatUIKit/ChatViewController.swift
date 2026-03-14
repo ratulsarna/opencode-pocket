@@ -1009,7 +1009,7 @@ private final class ChatCollectionBackgroundStatusView: UIView {
             spinner.stopAnimating()
             spinner.isHidden = true
             titleLabel.text = "Start a conversation"
-            subtitleLabel.text = "Ask OpenCode anything — or paste a link to discuss."
+            subtitleLabel.text = "Ask anything..."
             subtitleLabel.isHidden = false
 
         case .hidden:
