@@ -31,11 +31,13 @@ struct iOSApp: App {
         IosThemeApplier.installAutoReapply()
         IosThemeApplier.applyStoredPreference()
 
+        let arguments = ProcessInfo.processInfo.arguments
+        let argumentEnabled = arguments.contains("--mock-mode")
         let raw = ProcessInfo.processInfo.environment["OC_POCKET_MOCK_MODE"]?.trimmingCharacters(in: .whitespacesAndNewlines)
-        let enabled = raw == "1" || raw?.lowercased() == "true"
+        let enabled = argumentEnabled || raw == "1" || raw?.lowercased() == "true"
         if enabled {
             AppModule.shared.isMockMode = true
-            print("[oc-pocket] MOCK_MODE=1 enabled via env")
+            print("[oc-pocket] mock mode enabled")
         }
     }
 

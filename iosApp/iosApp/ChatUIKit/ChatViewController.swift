@@ -47,11 +47,8 @@ final class ChatViewController: UIViewController {
 
     private var dataSource: UICollectionViewDiffableDataSource<Section, MessageItem>?
     private var keyboardFrameObserver: NSObjectProtocol?
-
-    private let headerStack = UIStackView()
-    private let connectionBannerView = ChatConnectionBannerView()
-    private let errorBannerView = ChatErrorBannerView()
-    private let processingBar = ChatIndeterminateProgressBarView()
+    private var topChromeInset: CGFloat = 0
+    private var bottomChromeInset: CGFloat = 0
 
     private let backgroundStatusView = ChatCollectionBackgroundStatusView()
 
@@ -79,17 +76,12 @@ final class ChatViewController: UIViewController {
         view.backgroundColor = .clear
         view.alwaysBounceVertical = true
         view.keyboardDismissMode = .interactive
+        view.contentInsetAdjustmentBehavior = .never
         return view
     }()
 
-    private let bottomStack = UIStackView()
-    private let attachmentErrorView = ChatAttachmentErrorSnackbarView()
-    private var attachmentErrorDismissTask: Task<Void, Never>?
-    private var lastAttachmentErrorKey: String?
-
-    private let composerContainer = UIView()
-    private let composerView = ChatComposerView()
     private let scrollToBottomButton = UIButton(type: .system)
+    private var scrollToBottomButtonBottomConstraint: NSLayoutConstraint?
 
     init(
         viewModel: ChatViewModel,
@@ -109,53 +101,13 @@ final class ChatViewController: UIViewController {
         super.viewDidLoad()
 
         edgesForExtendedLayout = []
-        view.backgroundColor = .systemBackground
+        view.backgroundColor = .clear
 
         collectionView.register(ChatMessageCell.self, forCellWithReuseIdentifier: ChatMessageCell.reuseIdentifier)
         collectionView.register(ChatTypingIndicatorRowCell.self, forCellWithReuseIdentifier: ChatTypingIndicatorRowCell.reuseIdentifier)
         collectionView.delegate = self
 
-        headerStack.axis = .vertical
-        headerStack.spacing = 0
-
-        connectionBannerView.isHidden = true
-        errorBannerView.isHidden = true
-
-        processingBar.barColor = .systemBlue
-        processingBar.isHidden = true
-
-        headerStack.addArrangedSubview(connectionBannerView)
-        headerStack.addArrangedSubview(errorBannerView)
-        headerStack.addArrangedSubview(processingBar)
-
-        connectionBannerView.translatesAutoresizingMaskIntoConstraints = false
-        errorBannerView.translatesAutoresizingMaskIntoConstraints = false
-        processingBar.translatesAutoresizingMaskIntoConstraints = false
-
         collectionView.backgroundView = backgroundStatusView
-
-        attachmentErrorView.isHidden = true
-        attachmentErrorView.onDismiss = { [weak self] in
-            self?.viewModel.dismissAttachmentError()
-        }
-
-        composerContainer.backgroundColor = .clear
-        composerContainer.addSubview(composerView)
-        composerView.translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([
-            composerView.topAnchor.constraint(equalTo: composerContainer.topAnchor, constant: 8),
-            composerView.leadingAnchor.constraint(equalTo: composerContainer.leadingAnchor, constant: 12),
-            composerView.trailingAnchor.constraint(equalTo: composerContainer.trailingAnchor, constant: -12),
-            composerView.bottomAnchor.constraint(equalTo: composerContainer.bottomAnchor, constant: -8),
-        ])
-
-        bottomStack.axis = .vertical
-        bottomStack.spacing = 0
-        bottomStack.addArrangedSubview(attachmentErrorView)
-        bottomStack.addArrangedSubview(composerContainer)
-
-        attachmentErrorView.translatesAutoresizingMaskIntoConstraints = false
-        composerContainer.translatesAutoresizingMaskIntoConstraints = false
 
         scrollToBottomButton.setImage(UIImage(systemName: "arrow.down"), for: .normal)
         scrollToBottomButton.tintColor = .label
@@ -166,75 +118,44 @@ final class ChatViewController: UIViewController {
         scrollToBottomButton.isHidden = true
         scrollToBottomButton.addTarget(self, action: #selector(didTapScrollToBottom), for: .touchUpInside)
 
-        composerView.onPickPhotos = { [weak self] in
-            self?.presentPhotoPicker()
-        }
-        composerView.onPickFiles = { [weak self] in
-            self?.presentDocumentPicker()
-        }
-        composerView.onAddFromClipboard = { [weak self] in
-            self?.viewModel.addFromClipboard()
-        }
-        composerView.onRemoveAttachment = { [weak self] attachment in
-            self?.viewModel.removeAttachment(attachment: attachment)
-        }
-        composerView.onSelectMentionSuggestion = { [weak self] entry in
-            self?.viewModel.selectMentionSuggestion(entry: entry)
-        }
-        composerView.onSelectSlashCommandSuggestion = { [weak self] command in
-            self?.viewModel.selectSlashCommandSuggestion(command: command)
-        }
-        composerView.onTextAndCursorChange = { [weak self] newText, cursorPosition in
-            self?.viewModel.onInputTextChangeWithCursor(
-                newText: newText,
-                cursorPosition: Int32(cursorPosition)
-            )
-        }
-        composerView.onSend = { [weak self] in
-            self?.viewModel.sendCurrentMessage()
-        }
-        composerView.onAbort = { [weak self] in
-            self?.viewModel.abortSession()
-        }
-        composerView.onSelectThinkingVariant = { [weak self] variant in
-            self?.viewModel.setThinkingVariant(variant: variant)
-        }
-
-        view.addSubview(headerStack)
         view.addSubview(collectionView)
-        view.addSubview(bottomStack)
         view.addSubview(scrollToBottomButton)
 
-        headerStack.translatesAutoresizingMaskIntoConstraints = false
         collectionView.translatesAutoresizingMaskIntoConstraints = false
-        bottomStack.translatesAutoresizingMaskIntoConstraints = false
         scrollToBottomButton.translatesAutoresizingMaskIntoConstraints = false
 
-        let bottomToSafeArea = bottomStack.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor)
-        bottomToSafeArea.priority = .defaultHigh
-
         NSLayoutConstraint.activate([
-            headerStack.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
-            headerStack.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            headerStack.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-
-            bottomStack.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            bottomStack.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            bottomToSafeArea,
-            bottomStack.bottomAnchor.constraint(lessThanOrEqualTo: view.keyboardLayoutGuide.topAnchor),
-
-            collectionView.topAnchor.constraint(equalTo: headerStack.bottomAnchor),
+            collectionView.topAnchor.constraint(equalTo: view.topAnchor),
             collectionView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             collectionView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            collectionView.bottomAnchor.constraint(equalTo: bottomStack.topAnchor),
+            collectionView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
 
             scrollToBottomButton.widthAnchor.constraint(equalToConstant: 40),
             scrollToBottomButton.heightAnchor.constraint(equalToConstant: 40),
             scrollToBottomButton.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -16),
-            scrollToBottomButton.bottomAnchor.constraint(equalTo: bottomStack.topAnchor, constant: -16),
         ])
 
+        let scrollButtonBottomConstraint = scrollToBottomButton.bottomAnchor.constraint(
+            equalTo: view.safeAreaLayoutGuide.bottomAnchor,
+            constant: -16
+        )
+        scrollButtonBottomConstraint.isActive = true
+        scrollToBottomButtonBottomConstraint = scrollButtonBottomConstraint
+
         configureDataSource()
+        applyChromeInsets()
+    }
+
+    func setChromeInsets(top: CGFloat, bottom: CGFloat) {
+        let sanitizedTop = max(0, top)
+        let sanitizedBottom = max(0, bottom)
+        guard abs(topChromeInset - sanitizedTop) > 0.5 || abs(bottomChromeInset - sanitizedBottom) > 0.5 else {
+            return
+        }
+
+        topChromeInset = sanitizedTop
+        bottomChromeInset = sanitizedBottom
+        applyChromeInsets()
     }
 
     override func viewWillAppear(_ animated: Bool) {
@@ -250,7 +171,9 @@ final class ChatViewController: UIViewController {
                 object: nil,
                 queue: .main
             ) { [weak self] _ in
-                self?.handleKeyboardFrameChange()
+                Task { @MainActor [weak self] in
+                    self?.handleKeyboardFrameChange()
+                }
             }
         }
     }
@@ -263,9 +186,6 @@ final class ChatViewController: UIViewController {
     override func viewDidDisappear(_ animated: Bool) {
         super.viewDidDisappear(animated)
         uiStateBridge.stop()
-        processingBar.stopAnimating()
-        attachmentErrorDismissTask?.cancel()
-        attachmentErrorDismissTask = nil
         if let observer = keyboardFrameObserver {
             NotificationCenter.default.removeObserver(observer)
             keyboardFrameObserver = nil
@@ -335,9 +255,6 @@ final class ChatViewController: UIViewController {
         latestUiState = state
 
         let showTypingIndicator = TypingIndicatorKt.shouldShowTypingIndicator(state: state)
-        renderHeader(state: state, showTypingIndicator: showTypingIndicator)
-        composerView.render(uiState: state)
-        renderAttachmentError(state.attachmentError)
 
         handleMessageActions(state: state)
         handleRevertConfirmation(state: state)
@@ -490,68 +407,6 @@ final class ChatViewController: UIViewController {
             collectionView.layoutIfNeeded()
         }
         needsVisibleMessageCellRefresh = false
-    }
-
-    private func renderHeader(state: ChatUiState, showTypingIndicator: Bool) {
-        let isReconnecting = state.connectionState.name.uppercased() == "RECONNECTING"
-        connectionBannerView.isHidden = !isReconnecting
-
-        if let error = state.error {
-            errorBannerView.isHidden = false
-            let shouldShowRevert =
-                state.lastGoodMessageId != nil
-                && (error is ChatError.SessionCorrupted || error is ChatError.SendFailed)
-            errorBannerView.configure(
-                message: error.message ?? "An error occurred.",
-                showRevert: shouldShowRevert,
-                onDismiss: { [weak self] in self?.viewModel.dismissError() },
-                onRetry: { [weak self] in self?.viewModel.retry() },
-                onRevert: { [weak self] in self?.viewModel.revertToLastGood() }
-            )
-        } else {
-            errorBannerView.isHidden = true
-        }
-
-        // Only show the processing bar when the current visibility preset does NOT show the
-        // in-thread typing indicator (e.g., ALL/CUSTOM).
-        let isProcessing = state.sessionStatus.name.uppercased() == "PROCESSING"
-        let shouldShowProcessingBar = isProcessing && !showTypingIndicator
-        processingBar.isHidden = !shouldShowProcessingBar
-        if shouldShowProcessingBar {
-            processingBar.startAnimating()
-        } else {
-            processingBar.stopAnimating()
-        }
-    }
-
-    private func renderAttachmentError(_ error: AttachmentError?) {
-        guard let error else {
-            attachmentErrorView.isHidden = true
-            lastAttachmentErrorKey = nil
-            attachmentErrorDismissTask?.cancel()
-            attachmentErrorDismissTask = nil
-            return
-        }
-
-        attachmentErrorView.isHidden = false
-        attachmentErrorView.message = ChatAttachmentErrorPresentation.message(error)
-
-        let key = ChatAttachmentErrorPresentation.key(error)
-        guard key != lastAttachmentErrorKey else { return }
-        lastAttachmentErrorKey = key
-
-        attachmentErrorDismissTask?.cancel()
-        attachmentErrorDismissTask = Task { [weak self] in
-            do {
-                try await Task.sleep(nanoseconds: 2_750_000_000)
-            } catch {
-                return
-            }
-            if Task.isCancelled { return }
-            await MainActor.run {
-                self?.viewModel.dismissAttachmentError()
-            }
-        }
     }
 
     private func handleMessageActions(state: ChatUiState) {
@@ -1020,6 +875,18 @@ final class ChatViewController: UIViewController {
             self?.scrollToBottom(animated: false)
         }
     }
+
+    private func applyChromeInsets() {
+        let insets = UIEdgeInsets(
+            top: topChromeInset,
+            left: 0,
+            bottom: bottomChromeInset,
+            right: 0
+        )
+        collectionView.contentInset = insets
+        collectionView.scrollIndicatorInsets = insets
+        scrollToBottomButtonBottomConstraint?.constant = -(max(16, bottomChromeInset + 12))
+    }
 }
 
 private final class ChatCollectionBackgroundStatusView: UIView {
@@ -1181,7 +1048,7 @@ extension ChatViewController: PHPickerViewControllerDelegate, UIDocumentPickerDe
         return max(0, maxFiles - current)
     }
 
-    private func presentPhotoPicker() {
+    func presentPhotoPicker() {
         let remaining = remainingAttachmentSlots()
         guard remaining > 0 else { return }
 
@@ -1255,7 +1122,7 @@ extension ChatViewController: PHPickerViewControllerDelegate, UIDocumentPickerDe
         }
     }
 
-    private func presentDocumentPicker() {
+    func presentDocumentPicker() {
         let remaining = remainingAttachmentSlots()
         guard remaining > 0 else { return }
 

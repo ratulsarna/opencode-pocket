@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 import ComposeApp
 
 @MainActor
@@ -11,7 +12,9 @@ struct SwiftUIChatUIKitView: View {
 
     @StateObject private var store: ChatViewControllerStore
     @StateObject private var uiStateEvents = KmpUiEventBridge<ChatUiState>()
-    @State private var isRefreshing: Bool = false
+    @State private var latestUiState: ChatUiState?
+    @State private var topOverlayHeight: CGFloat = 0
+    @State private var bottomOverlayHeight: CGFloat = 0
 
     init(
         viewModel: ChatViewModel,
@@ -27,45 +30,157 @@ struct SwiftUIChatUIKitView: View {
         _store = StateObject(wrappedValue: ChatViewControllerStore(viewModel: viewModel))
     }
 
+    private var attachmentErrorKey: String? {
+        guard let error = latestUiState?.attachmentError else { return nil }
+        return ChatAttachmentErrorPresentation.key(error)
+    }
+
     var body: some View {
-        ChatUIKitContainerView(
-            controller: store.controller,
-            onOpenFile: onOpenFile
-        )
-        .ignoresSafeArea(.keyboard)
-        .navigationTitle("OpenCode")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
-        .toolbarBackground(.visible, for: .navigationBar)
+        GeometryReader { proxy in
+            ZStack {
+                ChatScreenBackground()
+
+                ChatUIKitContainerView(
+                    controller: store.controller,
+                    onOpenFile: onOpenFile,
+                    topInset: topOverlayHeight,
+                    bottomInset: bottomOverlayHeight
+                )
+
+                if let state = latestUiState {
+                    VStack(spacing: 0) {
+                        toolbarOverlay(state: state, safeTopInset: proxy.safeAreaInsets.top)
+                        Spacer(minLength: 0)
+                        composerOverlay(state: state, safeBottomInset: max(proxy.safeAreaInsets.bottom, 10))
+                    }
+                }
+            }
+            .ignoresSafeArea()
+        }
+        .toolbar(.hidden, for: .navigationBar)
         .onAppear {
             uiStateEvents.start(flow: viewModel.uiState) { state in
-                isRefreshing = state.isRefreshing
+                latestUiState = state
             }
         }
         .onDisappear {
             uiStateEvents.stop()
-            isRefreshing = false
         }
-        .toolbar {
-            ToolbarItemGroup(placement: .navigationBarTrailing) {
-                Button(action: viewModel.retry) {
-                    if isRefreshing {
-                        ProgressView()
-                            .controlSize(.small)
-                    } else {
-                        Image(systemName: "arrow.clockwise")
-                    }
-                }
-                .disabled(isRefreshing)
+        .task(id: attachmentErrorKey) {
+            guard attachmentErrorKey != nil else { return }
 
-                Button(action: onOpenSessions) {
-                    Image(systemName: "rectangle.stack")
-                }
-
-                Button(action: onOpenSettings) {
-                    Image(systemName: "gearshape")
-                }
+            do {
+                try await Task.sleep(nanoseconds: 2_750_000_000)
+            } catch {
+                return
             }
+
+            guard !Task.isCancelled else { return }
+            viewModel.dismissAttachmentError()
+        }
+    }
+
+    private func addPastedImages(_ imageDataItems: [Data]) {
+        let maxFiles = Int(AttachmentLimits.shared.MAX_FILES_PER_MESSAGE)
+        let currentCount = latestUiState?.pendingAttachments.count ?? 0
+        let remaining = max(0, maxFiles - currentCount)
+        guard remaining > 0 else { return }
+
+        for data in imageDataItems.prefix(remaining) {
+            let uuid = String(UUID().uuidString.prefix(8))
+            let attachment = ChatAttachmentBuilder.makeAttachment(
+                filename: "paste_\(uuid).jpg",
+                mimeType: "image/jpeg",
+                data: data
+            )
+            viewModel.addAttachment(attachment: attachment)
+        }
+    }
+
+    @ViewBuilder
+    private func toolbarOverlay(state: ChatUiState, safeTopInset: CGFloat) -> some View {
+        ChatToolbarGlassView(
+            state: state,
+            isRefreshing: state.isRefreshing,
+            onRetry: viewModel.retry,
+            onOpenSessions: onOpenSessions,
+            onOpenSettings: onOpenSettings,
+            onDismissError: viewModel.dismissError,
+            onRevert: viewModel.revertToLastGood
+        )
+        .padding(.horizontal, 12)
+        .padding(.top, safeTopInset + 6)
+        .padding(.bottom, 8)
+        .chatGlassHostRegion(cornerRadius: 34, tint: Color.white.opacity(0.10))
+        .background(HeightReader(height: $topOverlayHeight))
+    }
+
+    @ViewBuilder
+    private func composerOverlay(state: ChatUiState, safeBottomInset: CGFloat) -> some View {
+        VStack(spacing: 8) {
+            if let attachmentError = state.attachmentError {
+                ChatAttachmentErrorView(
+                    message: ChatAttachmentErrorPresentation.message(attachmentError),
+                    onDismiss: viewModel.dismissAttachmentError
+                )
+            }
+
+            ChatComposerCardView(
+                state: state,
+                onPickPhotos: store.controller.presentPhotoPicker,
+                onPickFiles: store.controller.presentDocumentPicker,
+                onAddFromClipboard: viewModel.addFromClipboard,
+                onRemoveAttachment: viewModel.removeAttachment,
+                onSelectMentionSuggestion: viewModel.selectMentionSuggestion,
+                onSelectSlashCommandSuggestion: viewModel.selectSlashCommandSuggestion,
+                onTextAndCursorChange: { newText, cursorPosition in
+                    viewModel.onInputTextChangeWithCursor(
+                        newText: newText,
+                        cursorPosition: Int32(cursorPosition)
+                    )
+                },
+                onSend: viewModel.sendCurrentMessage,
+                onAbort: viewModel.abortSession,
+                onSelectThinkingVariant: viewModel.setThinkingVariant,
+                onPasteImageData: addPastedImages
+            )
+        }
+        .padding(.horizontal, 12)
+        .padding(.top, 8)
+        .padding(.bottom, safeBottomInset)
+        .chatGlassHostRegion(cornerRadius: 36, tint: Color.white.opacity(0.08))
+        .background(HeightReader(height: $bottomOverlayHeight))
+    }
+}
+
+private struct ChatScreenBackground: View {
+    var body: some View {
+        ZStack {
+            Color(.systemBackground)
+                .ignoresSafeArea()
+
+            LinearGradient(
+                colors: [
+                    Color.accentColor.opacity(0.08),
+                    Color(.systemBackground),
+                    Color.orange.opacity(0.05)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            .ignoresSafeArea()
+
+            Circle()
+                .fill(Color.accentColor.opacity(0.07))
+                .frame(width: 220, height: 220)
+                .blur(radius: 28)
+                .offset(x: 110, y: -240)
+
+            Circle()
+                .fill(Color.orange.opacity(0.05))
+                .frame(width: 260, height: 260)
+                .blur(radius: 36)
+                .offset(x: -120, y: 280)
         }
     }
 }
@@ -75,9 +190,6 @@ private final class ChatViewControllerStore: ObservableObject {
     let controller: ChatViewController
 
     init(viewModel: ChatViewModel) {
-        // SwiftUI requires an initialized controller during `StateObject` creation.
-        // `ChatUIKitContainerView.updateUIViewController` replaces these no-ops with real closures
-        // before any user interaction can occur.
         controller = ChatViewController(
             viewModel: viewModel,
             onOpenFile: { _ in }
@@ -88,12 +200,39 @@ private final class ChatViewControllerStore: ObservableObject {
 private struct ChatUIKitContainerView: UIViewControllerRepresentable {
     let controller: ChatViewController
     let onOpenFile: (String) -> Void
+    let topInset: CGFloat
+    let bottomInset: CGFloat
 
     func makeUIViewController(context: Context) -> ChatViewController {
-        controller
+        controller.setChromeInsets(top: topInset, bottom: bottomInset)
+        return controller
     }
 
     func updateUIViewController(_ uiViewController: ChatViewController, context: Context) {
         uiViewController.onOpenFile = onOpenFile
+        uiViewController.setChromeInsets(top: topInset, bottom: bottomInset)
+    }
+}
+
+private struct HeightReader: View {
+    @Binding var height: CGFloat
+
+    var body: some View {
+        GeometryReader { proxy in
+            Color.clear
+                .onAppear {
+                    update(proxy.size.height)
+                }
+                .onChange(of: proxy.size.height) { _, newValue in
+                    update(newValue)
+                }
+        }
+    }
+
+    private func update(_ newHeight: CGFloat) {
+        guard abs(height - newHeight) > 0.5 else { return }
+        DispatchQueue.main.async {
+            height = newHeight
+        }
     }
 }

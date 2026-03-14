@@ -20,6 +20,7 @@ import com.ratulsarna.ocmobile.data.dto.SendMessageResponse
 import com.ratulsarna.ocmobile.data.dto.SessionDto
 import com.ratulsarna.ocmobile.data.dto.CommandInfoDto
 import com.ratulsarna.ocmobile.data.dto.SendCommandRequest
+import kotlinx.serialization.json.JsonPrimitive
 
 /**
  * Mock implementation of OpenCodeApi.
@@ -207,7 +208,13 @@ class MockOpenCodeApi(
                 models = mapOf(
                     "claude-sonnet-4-20250514" to ModelDto(
                         id = "claude-sonnet-4-20250514",
-                        name = "Claude Sonnet 4"
+                        name = "Claude Sonnet 4",
+                        capabilities = com.ratulsarna.ocmobile.data.dto.ModelCapabilitiesDto(reasoning = true),
+                        variants = mapOf(
+                            "low" to JsonPrimitive(true),
+                            "high" to JsonPrimitive(true),
+                            "max" to JsonPrimitive(true)
+                        )
                     ),
                     "claude-3-5-sonnet-20241022" to ModelDto(
                         id = "claude-3-5-sonnet-20241022",
