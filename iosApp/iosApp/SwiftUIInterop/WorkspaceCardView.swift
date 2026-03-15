@@ -4,7 +4,6 @@ import ComposeApp
 @MainActor
 struct WorkspaceCardView: View {
     let workspaceWithSessions: WorkspaceWithSessions
-    let isActive: Bool
     let activeSessionId: String?
     let isExpanded: Bool
     let isFullyExpanded: Bool
@@ -19,9 +18,8 @@ struct WorkspaceCardView: View {
             return name
         }
         let worktree = workspaceWithSessions.workspace.worktree
-        return (worktree as NSString).lastPathComponent.isEmpty
-            ? workspaceWithSessions.workspace.projectId
-            : (worktree as NSString).lastPathComponent
+        let last = (worktree as NSString).lastPathComponent
+        return last.isEmpty ? workspaceWithSessions.workspace.projectId : last
     }
 
     private var sessions: [Session] {
@@ -34,18 +32,16 @@ struct WorkspaceCardView: View {
         max(0, Int(workspaceWithSessions.sessions.count) - 3)
     }
 
-    @Namespace private var glassNamespace
-
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Header row
+            // Workspace header
             HStack(spacing: 10) {
-                Image(systemName: "folder.fill")
+                Image(systemName: "folder")
                     .foregroundStyle(.secondary)
                     .font(.body)
 
                 Text(displayTitle)
-                    .font(.system(.subheadline, design: .rounded).weight(.semibold))
+                    .font(.system(.body, design: .default).weight(.medium))
                     .foregroundStyle(.primary)
                     .lineLimit(1)
 
@@ -55,27 +51,17 @@ struct WorkspaceCardView: View {
                     ProgressView()
                         .controlSize(.small)
                 } else {
-                    if #available(iOS 26, *) {
-                        Button(action: onCreateSession) {
-                            Image(systemName: "plus")
-                                .font(.system(.caption, weight: .semibold))
-                        }
-                        .buttonStyle(.glass)
-                    } else {
-                        Button(action: onCreateSession) {
-                            Image(systemName: "plus")
-                                .font(.system(.caption, weight: .semibold))
-                                .foregroundStyle(.secondary)
-                        }
-                        .buttonStyle(.plain)
+                    Button(action: onCreateSession) {
+                        Image(systemName: "plus")
+                            .font(.system(.subheadline, weight: .medium))
+                            .foregroundStyle(.secondary)
+                            .frame(width: 28, height: 28)
+                            .background(Color(.tertiarySystemFill), in: Circle())
                     }
+                    .buttonStyle(.plain)
                 }
-
-                Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
             }
-            .padding(.horizontal, 14)
+            .padding(.horizontal, 16)
             .padding(.vertical, 12)
             .contentShape(Rectangle())
             .onTapGesture(perform: onToggleExpand)
@@ -89,21 +75,21 @@ struct WorkspaceCardView: View {
                             .controlSize(.small)
                         Spacer()
                     }
-                    .padding(.vertical, 8)
+                    .padding(.vertical, 10)
                 } else if let error = workspaceWithSessions.error {
                     Text(error)
                         .font(.caption)
                         .foregroundStyle(.red)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 8)
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 10)
                 } else if sessions.isEmpty {
                     Text("No sessions")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 8)
+                        .font(.subheadline)
+                        .foregroundStyle(.tertiary)
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 10)
                 } else {
-                    VStack(alignment: .leading, spacing: 0) {
+                    VStack(alignment: .leading, spacing: 2) {
                         ForEach(sessions, id: \.id) { session in
                             sessionRow(session)
                                 .transition(.opacity.combined(with: .move(edge: .top)))
@@ -111,87 +97,77 @@ struct WorkspaceCardView: View {
 
                         if hiddenCount > 0 && !isFullyExpanded {
                             Button(action: onToggleFullExpand) {
-                                Text("View \(hiddenCount) more sessions")
+                                Text("View \(hiddenCount) more")
                                     .font(.caption)
-                                    .foregroundStyle(.accent)
+                                    .foregroundStyle(.accentColor)
                             }
                             .buttonStyle(.plain)
-                            .padding(.horizontal, 14)
+                            .padding(.horizontal, 16)
                             .padding(.vertical, 8)
                         } else if isFullyExpanded && hiddenCount > 0 {
                             Button(action: onToggleFullExpand) {
                                 Text("Show less")
                                     .font(.caption)
-                                    .foregroundStyle(.accent)
+                                    .foregroundStyle(.accentColor)
                             }
                             .buttonStyle(.plain)
-                            .padding(.horizontal, 14)
+                            .padding(.horizontal, 16)
                             .padding(.vertical, 8)
                         }
                     }
+                    .padding(.bottom, 4)
                 }
             }
         }
-        .workspaceCardGlass(isActive: isActive)
-        .workspaceCardGlassID(workspaceWithSessions.workspace.projectId, namespace: glassNamespace)
     }
 
     @ViewBuilder
     private func sessionRow(_ session: Session) -> some View {
+        let isActiveSession = session.id == activeSessionId
+
         Button {
             onSelectSession(session.id)
         } label: {
             HStack(spacing: 8) {
-                if session.id == activeSessionId {
+                if isActiveSession {
                     Circle()
                         .fill(Color.accentColor)
                         .frame(width: 6, height: 6)
-                } else {
-                    Circle()
-                        .fill(Color.clear)
-                        .frame(width: 6, height: 6)
                 }
 
-                Text(session.title ?? session.id.prefix(8).description)
+                Text(session.title ?? String(session.id.prefix(8)))
                     .font(.subheadline)
-                    .foregroundStyle(session.id == activeSessionId ? .primary : .secondary)
+                    .foregroundStyle(isActiveSession ? .primary : .secondary)
                     .lineLimit(1)
 
-                Spacer()
+                Spacer(minLength: 0)
+
+                Text(relativeTime(session.updatedAt))
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
             }
-            .padding(.horizontal, 14)
+            .padding(.horizontal, 16)
             .padding(.vertical, 8)
-            .contentShape(Rectangle())
+            .background(
+                isActiveSession
+                    ? Color(.tertiarySystemFill)
+                    : Color.clear,
+                in: RoundedRectangle(cornerRadius: 8)
+            )
+            .padding(.horizontal, 8)
         }
         .buttonStyle(.plain)
     }
-}
 
-// MARK: - Glass modifiers
+    private func relativeTime(_ instant: KotlinInstant) -> String {
+        let epochMs = instant.toEpochMilliseconds()
+        let date = Date(timeIntervalSince1970: TimeInterval(epochMs) / 1000.0)
+        let interval = Date().timeIntervalSince(date)
 
-private extension View {
-    @ViewBuilder
-    func workspaceCardGlass(isActive: Bool) -> some View {
-        if #available(iOS 26, *) {
-            if isActive {
-                self.glassEffect(.regular.tint(.accentColor).interactive(), in: .rect(cornerRadius: 12))
-            } else {
-                self.glassEffect(.regular.interactive(), in: .rect(cornerRadius: 12))
-            }
-        } else {
-            self.background(
-                isActive ? Color.accentColor.opacity(0.08) : Color(.secondarySystemGroupedBackground),
-                in: RoundedRectangle(cornerRadius: 12)
-            )
-        }
-    }
-
-    @ViewBuilder
-    func workspaceCardGlassID(_ id: String, namespace: Namespace.ID) -> some View {
-        if #available(iOS 26, *) {
-            self.glassEffectID(id, in: namespace)
-        } else {
-            self
-        }
+        if interval < 60 { return "now" }
+        if interval < 3600 { return "\(Int(interval / 60))m" }
+        if interval < 86400 { return "\(Int(interval / 3600))h" }
+        if interval < 604800 { return "\(Int(interval / 86400))d" }
+        return "\(Int(interval / 604800))w"
     }
 }

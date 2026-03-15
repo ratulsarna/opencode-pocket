@@ -60,7 +60,6 @@ struct WorkspacesSidebarView: View {
         .task(id: latestUiState?.createdSessionId ?? "") {
             guard let sessionId = latestUiState?.createdSessionId, !sessionId.isEmpty else { return }
             viewModel.clearCreatedSession()
-            // If a workspace switch is also pending, let that handle the reset
             if latestUiState?.switchedWorkspaceId != nil {
                 return
             }
@@ -71,69 +70,54 @@ struct WorkspacesSidebarView: View {
     @ViewBuilder
     private func sidebarContent(state: SidebarUiState) -> some View {
         ScrollView {
-            glassContainerWrapper {
-                LazyVStack(spacing: 12) {
-                    ForEach(state.workspaces, id: \.workspace.projectId) { workspaceWithSessions in
-                        let projectId = workspaceWithSessions.workspace.projectId
-                        let isActive = projectId == state.activeWorkspaceId
-                        let isExp = expanded.contains(projectId)
-                        let isFull = fullyExpanded.contains(projectId)
+            LazyVStack(spacing: 4) {
+                ForEach(state.workspaces, id: \.workspace.projectId) { workspaceWithSessions in
+                    let projectId = workspaceWithSessions.workspace.projectId
+                    let isExp = expanded.contains(projectId)
+                    let isFull = fullyExpanded.contains(projectId)
 
-                        WorkspaceCardView(
-                            workspaceWithSessions: workspaceWithSessions,
-                            isActive: isActive,
-                            activeSessionId: state.activeSessionId,
-                            isExpanded: isExp,
-                            isFullyExpanded: isFull,
-                            isCreatingSession: state.isCreatingSession,
-                            onToggleExpand: {
-                                withAnimation(.easeInOut(duration: 0.25)) {
-                                    if expanded.contains(projectId) {
-                                        expanded.remove(projectId)
-                                    } else {
-                                        expanded.insert(projectId)
-                                        // Load sessions on first expand (or background refresh if cached)
-                                        viewModel.loadSessionsForWorkspace(projectId: projectId)
-                                    }
-                                }
-                            },
-                            onToggleFullExpand: {
-                                withAnimation(.easeInOut(duration: 0.25)) {
-                                    if fullyExpanded.contains(projectId) {
-                                        fullyExpanded.remove(projectId)
-                                    } else {
-                                        fullyExpanded.insert(projectId)
-                                    }
-                                }
-                            },
-                            onSelectSession: { sessionId in
-                                if isActive {
-                                    viewModel.switchSession(sessionId: sessionId)
-                                    onSelectSession()
+                    WorkspaceCardView(
+                        workspaceWithSessions: workspaceWithSessions,
+                        activeSessionId: state.activeSessionId,
+                        isExpanded: isExp,
+                        isFullyExpanded: isFull,
+                        isCreatingSession: state.isCreatingSession,
+                        onToggleExpand: {
+                            withAnimation(.easeInOut(duration: 0.25)) {
+                                if expanded.contains(projectId) {
+                                    expanded.remove(projectId)
                                 } else {
-                                    viewModel.switchWorkspace(projectId: projectId, sessionId: sessionId)
+                                    expanded.insert(projectId)
+                                    viewModel.loadSessionsForWorkspace(projectId: projectId)
                                 }
-                            },
-                            onCreateSession: {
-                                viewModel.createSession(workspaceProjectId: projectId)
                             }
-                        )
-                    }
+                        },
+                        onToggleFullExpand: {
+                            withAnimation(.easeInOut(duration: 0.25)) {
+                                if fullyExpanded.contains(projectId) {
+                                    fullyExpanded.remove(projectId)
+                                } else {
+                                    fullyExpanded.insert(projectId)
+                                }
+                            }
+                        },
+                        onSelectSession: { sessionId in
+                            let isActiveWorkspace = projectId == state.activeWorkspaceId
+                            if isActiveWorkspace {
+                                viewModel.switchSession(sessionId: sessionId)
+                                onSelectSession()
+                            } else {
+                                viewModel.switchWorkspace(projectId: projectId, sessionId: sessionId)
+                            }
+                        },
+                        onCreateSession: {
+                            viewModel.createSession(workspaceProjectId: projectId)
+                        }
+                    )
                 }
-                .padding(.horizontal, 16)
-                .padding(.top, 8)
             }
-        }
-    }
-
-    @ViewBuilder
-    private func glassContainerWrapper<Content: View>(@ViewBuilder content: () -> Content) -> some View {
-        if #available(iOS 26, *) {
-            GlassEffectContainer(spacing: 12) {
-                content()
-            }
-        } else {
-            content()
+            .padding(.horizontal, 12)
+            .padding(.top, 8)
         }
     }
 
