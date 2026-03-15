@@ -51,12 +51,12 @@ class SidebarViewModel(
             ) { workspaces, active ->
                 workspaces to active
             }.collect { (workspaces, active) ->
-                _uiState.update {
-                    it.copy(
+                _uiState.update { current ->
+                    current.copy(
                         activeWorkspaceId = active?.projectId,
-                        workspaces = workspaces.map { workspace ->
-                            val existing = it.workspaces.find { w -> w.workspace.projectId == workspace.projectId }
-                            existing?.copy(workspace = workspace) ?: WorkspaceWithSessions(workspace = workspace)
+                        workspaces = workspaces.map { incoming ->
+                            val existing = current.workspaces.find { w -> w.workspace.projectId == incoming.projectId }
+                            existing?.copy(workspace = incoming) ?: WorkspaceWithSessions(workspace = incoming)
                         }
                     )
                 }
@@ -197,6 +197,9 @@ class SidebarViewModel(
     fun refresh() {
         viewModelScope.launch {
             workspaceRepository.refresh()
+                .onFailure { error ->
+                    OcMobileLog.w(TAG, "Failed to refresh workspaces: ${error.message}")
+                }
         }
     }
 }
