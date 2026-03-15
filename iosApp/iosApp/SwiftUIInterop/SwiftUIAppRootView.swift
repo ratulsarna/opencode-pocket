@@ -6,7 +6,6 @@ private enum SwiftUIAppRoute: Hashable {
     case connect
     case settings
     case modelSelection
-    case workspaces
     case markdownFile(path: String, openId: Int64)
 }
 
@@ -18,13 +17,26 @@ struct SwiftUIAppRootView: View {
     @State private var markdownManager = MarkdownFlowStoreManager()
     @State private var path: [SwiftUIAppRoute] = []
     @Environment(\.scenePhase) private var scenePhase
-    @State private var isShowingSessions: Bool = false
+    @State private var sidebarVisibility: NavigationSplitViewVisibility = .detailOnly
+    @State private var settingsUiState: SettingsUiState?
+    @StateObject private var sidebarUiStateEvents = KmpUiEventBridge<SidebarUiState>()
+    @State private var sidebarUiState: SidebarUiState?
 
     @StateObject private var shareEvents = KmpUiEventBridge<SharePayload?>()
     @StateObject private var settingsUiStateEvents = KmpUiEventBridge<SettingsUiState>()
     @State private var pendingThemeVerification: Task<Void, Never>?
     @State private var desiredInterfaceStyle: UIUserInterfaceStyle = IosThemeApplier.readStoredStyle()
     @State private var showThemeRestartNotice: Bool = false
+
+    private var activeSessionTitle: String? {
+        guard let state = sidebarUiState,
+              let activeWorkspaceId = state.activeWorkspaceId,
+              let activeSessionId = state.activeSessionId,
+              let workspace = state.workspaces.first(where: { $0.workspace.projectId == activeWorkspaceId }),
+              let session = workspace.sessions.first(where: { $0.id == activeSessionId })
+        else { return nil }
+        return session.title
+    }
 
     var body: some View {
         let connectViewModel = kmp.owner.connectViewModel()
@@ -54,70 +66,78 @@ struct SwiftUIAppRootView: View {
     private func pairedAppView(connectViewModel: ConnectViewModel) -> some View {
         let chatViewModel = kmp.owner.chatViewModel()
         let settingsViewModel = kmp.owner.settingsViewModel()
-        let workspacesViewModel = kmp.owner.workspacesViewModel()
+        let sidebarViewModel = kmp.owner.sidebarViewModel()
 
-        NavigationStack(path: $path) {
-            Group {
-                SwiftUIChatUIKitView(
-                    viewModel: chatViewModel,
-                    onOpenSettings: { path.append(.settings) },
-                    onOpenSessions: { isShowingSessions = true },
-                    onOpenFile: { openMarkdownFile($0) }
-                )
-            }
-            .navigationDestination(for: SwiftUIAppRoute.self) { route in
-                switch route {
-                case .connect:
-                    SwiftUIConnectToOpenCodeView(
-                        viewModel: connectViewModel,
-                        onConnected: { onRequestAppReset() },
-                        onDisconnected: { onRequestAppReset() }
-                    )
-
-                case .settings:
-                    SwiftUISettingsView(
-                        viewModel: settingsViewModel,
-                        onOpenConnect: { path.append(.connect) },
-                        onOpenModelSelection: { path.append(.modelSelection) },
-                        onOpenWorkspaces: { path.append(.workspaces) },
-                        onOpenSessions: { isShowingSessions = true },
-                        themeRestartNotice: $showThemeRestartNotice
-                    )
-
-                case .modelSelection:
-                    SwiftUIModelSelectionView(viewModel: settingsViewModel)
-
-                case .workspaces:
-                    SwiftUIWorkspacesView(
-                        viewModel: workspacesViewModel,
-                        onDidSwitchWorkspace: { onRequestAppReset() }
-                    )
-
-                case .markdownFile(let filePath, let openId):
-                    let key = MarkdownRouteKey(path: filePath, openId: openId)
-                    if let store = markdownManager.stores[key] {
-                        SwiftUIMarkdownFileViewerView(
-                            viewModel: store.owner.markdownFileViewerViewModel(path: filePath, openId: openId),
-                            onOpenFile: { openMarkdownFile($0) }
-                        )
-                    } else {
-                        SamFullScreenLoadingView(title: "Opening file…")
-                            .task {
-                                markdownManager.ensureStore(for: key)
+        NavigationSplitView(columnVisibility: $sidebarVisibility) {
+            WorkspacesSidebarView(
+                viewModel: sidebarViewModel,
+                onSelectSession: {
+                    sidebarVisibility = .detailOnly
+                },
+                onRequestAppReset: { onRequestAppReset() }
+            )
+        } detail: {
+            NavigationStack(path: $path) {
+                Group {
+                    SwiftUIChatUIKitView(
+                        viewModel: chatViewModel,
+                        onOpenSettings: { path.append(.settings) },
+                        onToggleSidebar: {
+                            withAnimation {
+                                sidebarVisibility = sidebarVisibility == .detailOnly
+                                    ? .doubleColumn
+                                    : .detailOnly
                             }
+                        },
+                        onOpenFile: { openMarkdownFile($0) },
+                        sessionTitle: activeSessionTitle,
+                        workspacePath: settingsUiState?.activeWorkspaceWorktree
+                    )
+                }
+                .navigationDestination(for: SwiftUIAppRoute.self) { route in
+                    switch route {
+                    case .connect:
+                        SwiftUIConnectToOpenCodeView(
+                            viewModel: connectViewModel,
+                            onConnected: { onRequestAppReset() },
+                            onDisconnected: { onRequestAppReset() }
+                        )
+
+                    case .settings:
+                        SwiftUISettingsView(
+                            viewModel: settingsViewModel,
+                            onOpenConnect: { path.append(.connect) },
+                            onOpenModelSelection: { path.append(.modelSelection) },
+                            themeRestartNotice: $showThemeRestartNotice
+                        )
+
+                    case .modelSelection:
+                        SwiftUIModelSelectionView(viewModel: settingsViewModel)
+
+                    case .markdownFile(let filePath, let openId):
+                        let key = MarkdownRouteKey(path: filePath, openId: openId)
+                        if let store = markdownManager.stores[key] {
+                            SwiftUIMarkdownFileViewerView(
+                                viewModel: store.owner.markdownFileViewerViewModel(path: filePath, openId: openId),
+                                onOpenFile: { openMarkdownFile($0) }
+                            )
+                        } else {
+                            SamFullScreenLoadingView(title: "Opening file…")
+                                .task {
+                                    markdownManager.ensureStore(for: key)
+                                }
+                        }
                     }
                 }
             }
         }
-        .sheet(isPresented: $isShowingSessions) {
-            SwiftUISessionsSheetView()
-        }
+        .navigationSplitViewStyle(.balanced)
         .onAppear {
-            // Apply a best-effort theme override on first appearance. Launch-time application happens in `iOSApp`,
-            // but we re-apply here in case the window did not exist yet.
             IosThemeApplier.apply(style: desiredInterfaceStyle)
 
             settingsUiStateEvents.start(flow: settingsViewModel.uiState) { uiState in
+                settingsUiState = uiState
+
                 let newStyle = IosThemeApplier.style(fromStoredString: uiState.selectedThemeMode.name)
                 if newStyle == desiredInterfaceStyle { return }
 
@@ -142,10 +162,15 @@ struct SwiftUIAppRootView: View {
             shareEvents.start(flow: ShareExtensionBridge.shared.pendingPayload) { payload in
                 handleSharePayload(payload, chatViewModel: chatViewModel)
             }
+
+            sidebarUiStateEvents.start(flow: sidebarViewModel.uiState) { state in
+                sidebarUiState = state
+            }
         }
         .onDisappear {
             settingsUiStateEvents.stop()
             shareEvents.stop()
+            sidebarUiStateEvents.stop()
             pendingThemeVerification?.cancel()
             pendingThemeVerification = nil
         }
