@@ -173,10 +173,11 @@ private extension View {
     @ViewBuilder
     func workspaceCardGlass(isActive: Bool) -> some View {
         if #available(iOS 26, *) {
-            let glass: GlassEffect = isActive
-                ? .regular.tint(.accentColor).interactive()
-                : .regular.interactive()
-            self.glassEffect(glass, in: .rect(cornerRadius: 12))
+            if isActive {
+                self.glassEffect(.regular.tint(.accentColor).interactive(), in: .rect(cornerRadius: 12))
+            } else {
+                self.glassEffect(.regular.interactive(), in: .rect(cornerRadius: 12))
+            }
         } else {
             self.background(
                 isActive ? Color.accentColor.opacity(0.08) : Color(.secondarySystemGroupedBackground),
