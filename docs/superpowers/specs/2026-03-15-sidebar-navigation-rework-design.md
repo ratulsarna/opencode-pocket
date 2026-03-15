@@ -184,17 +184,36 @@ data class SidebarUiState(
 data class WorkspaceWithSessions(
     val workspace: Workspace,
     val sessions: List<Session>,    // sorted by updatedAt desc
-    val isLoading: Boolean          // loading sessions for this workspace
+    val isLoading: Boolean,         // loading sessions for this workspace
+    val error: String?              // per-workspace loading error
 )
 ```
 
+### Session-Workspace Association
+
+Sessions are grouped into workspaces by matching `Session.directory` against `Workspace.worktree`. A session belongs to the workspace whose `worktree` path matches the session's `directory` field.
+
+### Session Fetching Strategy
+
+The current `SessionRepository.getSessions()` API fetches all sessions globally (no workspace/directory filter). The `SidebarViewModel` fetches all sessions once, then groups and filters client-side by matching `Session.directory` to each `Workspace.worktree`. This avoids API changes and is efficient given the expected session count. Lazy loading per-workspace means: the global fetch is triggered on first sidebar open, but the client-side grouping for a collapsed workspace is deferred until expansion.
+
+### Cross-Reset Session Persistence
+
+When `switchWorkspace(workspaceId, sessionId)` is called for a different workspace, the target session ID is written to `AppSettings` via `setCurrentSessionId(sessionId)` **before** triggering the app reset. After reset, the new DI graph reads `getCurrentSessionId()` during initialization and activates that session. This matches the existing pattern where `AppSettings` persists state across resets.
+
+Note: `SidebarUiState.activeSessionId` maps to `AppSettings.currentSessionId` — these refer to the same value, no new persistence key is needed.
+
 ### Key Behaviors
 
-- On init, fetches workspaces. Sessions for the **active workspace** are fetched eagerly. Sessions for other workspaces are fetched **lazily** — only when that workspace is first expanded.
+- On init, fetches workspaces. Sessions are fetched globally and grouped client-side by matching `Session.directory` to `Workspace.worktree`.
 - `createSession(workspaceId)` — creates session, handles workspace switch if needed.
 - `addWorkspace(path)` — adds workspace to the list.
 - `switchSession(sessionId)` — for same-workspace session switches.
-- `switchWorkspace(workspaceId, sessionId)` — triggers app reset + session activation.
+- `switchWorkspace(workspaceId, sessionId)` — writes target session ID to `AppSettings`, then triggers app reset.
+
+### Dropped Feature: Session Search
+
+The current `SessionsView` has `.searchable` for filtering sessions. This is intentionally dropped from the initial sidebar implementation to keep scope focused. Session search can be added later as a filter field within the sidebar if needed.
 
 ### Swift Side
 
@@ -208,11 +227,11 @@ data class WorkspaceWithSessions(
 
 | File | Reason |
 |------|--------|
-| `SwiftUISessionsSheetView.swift` | Replaced by sidebar |
-| `SwiftUISessionsView.swift` | Replaced by sidebar |
-| `SwiftUIWorkspacesView.swift` | Replaced by sidebar |
-| `SessionsViewModel.kt` | Logic absorbed into `SidebarViewModel` |
-| `WorkspacesViewModel.kt` | Logic absorbed into `SidebarViewModel` |
+| `iosApp/iosApp/SwiftUIInterop/SwiftUISessionsViews.swift` | Contains both `SwiftUISessionsSheetView` and `SwiftUISessionsView`. Replaced by sidebar |
+| `iosApp/iosApp/SwiftUIInterop/SwiftUIWorkspacesViews.swift` | Contains `SwiftUIWorkspacesView`. Replaced by sidebar |
+| `composeApp/src/commonMain/kotlin/com/ratulsarna/ocmobile/ui/screen/sessions/SessionsViewModel.kt` | Logic absorbed into `SidebarViewModel` |
+| `composeApp/src/commonMain/kotlin/com/ratulsarna/ocmobile/ui/screen/workspaces/WorkspacesViewModel.kt` | Logic absorbed into `SidebarViewModel` |
+| `composeApp/src/jvmTest/kotlin/com/ratulsarna/ocmobile/ui/screen/sessions/SessionsViewModelTest.kt` | Tests for deleted `SessionsViewModel` — migrate relevant cases to `SidebarViewModelTest` |
 
 ### Settings Cleanup (`SwiftUISettingsView`)
 
@@ -241,8 +260,10 @@ Keep:
 
 ### DI Cleanup
 
-- Remove `SessionsViewModel` and `WorkspacesViewModel` from `IosAppViewModelOwner` / `IosScreenViewModelOwner`.
+- Remove `SessionsViewModel` from `IosScreenViewModelOwner`.
+- Remove `WorkspacesViewModel` from `IosAppViewModelOwner`.
 - Add `SidebarViewModel` to `IosAppViewModelOwner` (app-scoped).
+- `IosScreenViewModelOwner` retains only `markdownFileViewerViewModel()` after this change.
 
 ## New Files
 
@@ -250,4 +271,4 @@ Keep:
 |------|----------|---------|
 | `WorkspacesSidebarView.swift` | `iosApp/iosApp/SwiftUIInterop/` | Sidebar root view with toolbar and workspace list |
 | `WorkspaceCardView.swift` | `iosApp/iosApp/SwiftUIInterop/` | Individual workspace card with expand/collapse, session rows, glass treatment |
-| `SidebarViewModel.kt` | `composeApp/src/commonMain/kotlin/ui/screen/` | Combined workspace + session state management |
+| `SidebarViewModel.kt` | `composeApp/src/commonMain/kotlin/com/ratulsarna/ocmobile/ui/screen/sidebar/` | Combined workspace + session state management |
