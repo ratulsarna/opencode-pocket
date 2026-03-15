@@ -99,7 +99,7 @@ struct WorkspaceCardView: View {
                             Button(action: onToggleFullExpand) {
                                 Text("View \(hiddenCount) more")
                                     .font(.caption)
-                                    .foregroundStyle(.accentColor)
+                                    .foregroundStyle(Color.accentColor)
                             }
                             .buttonStyle(.plain)
                             .padding(.horizontal, 16)
@@ -108,7 +108,7 @@ struct WorkspaceCardView: View {
                             Button(action: onToggleFullExpand) {
                                 Text("Show less")
                                     .font(.caption)
-                                    .foregroundStyle(.accentColor)
+                                    .foregroundStyle(Color.accentColor)
                             }
                             .buttonStyle(.plain)
                             .padding(.horizontal, 16)
