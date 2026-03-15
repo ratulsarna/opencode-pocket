@@ -7,8 +7,10 @@ struct SwiftUIChatUIKitView: View {
     let viewModel: ChatViewModel
 
     let onOpenSettings: () -> Void
-    let onOpenSessions: () -> Void
+    let onToggleSidebar: () -> Void
     let onOpenFile: (String) -> Void
+    let sessionTitle: String?
+    let workspacePath: String?
 
     @StateObject private var store: ChatViewControllerStore
     @StateObject private var uiStateEvents = KmpUiEventBridge<ChatUiState>()
@@ -19,13 +21,17 @@ struct SwiftUIChatUIKitView: View {
     init(
         viewModel: ChatViewModel,
         onOpenSettings: @escaping () -> Void,
-        onOpenSessions: @escaping () -> Void,
-        onOpenFile: @escaping (String) -> Void
+        onToggleSidebar: @escaping () -> Void,
+        onOpenFile: @escaping (String) -> Void,
+        sessionTitle: String?,
+        workspacePath: String?
     ) {
         self.viewModel = viewModel
         self.onOpenSettings = onOpenSettings
-        self.onOpenSessions = onOpenSessions
+        self.onToggleSidebar = onToggleSidebar
         self.onOpenFile = onOpenFile
+        self.sessionTitle = sessionTitle
+        self.workspacePath = workspacePath
 
         _store = StateObject(wrappedValue: ChatViewControllerStore(viewModel: viewModel))
     }
@@ -106,10 +112,12 @@ struct SwiftUIChatUIKitView: View {
             state: state,
             isRefreshing: state.isRefreshing,
             onRetry: viewModel.retry,
-            onOpenSessions: onOpenSessions,
+            onToggleSidebar: onToggleSidebar,
             onOpenSettings: onOpenSettings,
             onDismissError: viewModel.dismissError,
-            onRevert: viewModel.revertToLastGood
+            onRevert: viewModel.revertToLastGood,
+            sessionTitle: sessionTitle,
+            workspacePath: workspacePath
         )
         .padding(.horizontal, 12)
         .padding(.top, safeTopInset + 2)

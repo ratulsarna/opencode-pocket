@@ -7,10 +7,12 @@ struct ChatToolbarGlassView: View {
     let state: ChatUiState
     let isRefreshing: Bool
     let onRetry: () -> Void
-    let onOpenSessions: () -> Void
+    let onToggleSidebar: () -> Void
     let onOpenSettings: () -> Void
     let onDismissError: () -> Void
     let onRevert: () -> Void
+    let sessionTitle: String?
+    let workspacePath: String?
 
     private var showTypingIndicator: Bool {
         TypingIndicatorKt.shouldShowTypingIndicator(state: state)
@@ -25,10 +27,11 @@ struct ChatToolbarGlassView: View {
     }
 
     private var subtitle: String {
-        guard let sessionId = state.currentSessionId, !sessionId.isEmpty else {
+        guard let path = workspacePath, !path.isEmpty else {
             return "Pocket chat"
         }
-        return "Session \(sessionId.prefix(8))"
+        let lastComponent = (path as NSString).lastPathComponent
+        return lastComponent.isEmpty ? path : "…/\(lastComponent)"
     }
 
     private var shouldShowRevert: Bool {
@@ -41,8 +44,12 @@ struct ChatToolbarGlassView: View {
             VStack(spacing: 10) {
                 VStack(spacing: 0) {
                     HStack(alignment: .center, spacing: 12) {
+                        ChatToolbarIconButton(action: onToggleSidebar) {
+                            Image(systemName: "line.3.horizontal")
+                        }
+
                         VStack(alignment: .leading, spacing: 3) {
-                            Text("OpenCode")
+                            Text(sessionTitle ?? "OpenCode")
                                 .font(.system(.title3, design: .rounded).weight(.semibold))
                                 .foregroundStyle(.primary)
                                 .lineLimit(1)
@@ -65,10 +72,6 @@ struct ChatToolbarGlassView: View {
                                 }
                             }
                             .disabled(isRefreshing)
-
-                            ChatToolbarIconButton(action: onOpenSessions) {
-                                Image(systemName: "rectangle.stack")
-                            }
 
                             ChatToolbarIconButton(action: onOpenSettings) {
                                 Image(systemName: "gearshape")
