@@ -128,10 +128,6 @@ struct SwiftUIAppRootView: View {
                             withAnimation(.snappy(duration: 0.28)) {
                                 isSidebarPresented = false
                             }
-                        },
-                        onRequestAppReset: {
-                            isSidebarPresented = false
-                            onRequestAppReset()
                         }
                     )
                 }
@@ -191,6 +187,21 @@ struct SwiftUIAppRootView: View {
                 return nil
             })
             markdownManager.prune(activeKeys: activeMarkdownKeys)
+        }
+        .onChange(of: sidebarUiState?.switchedWorkspaceId) { switchedWorkspaceId in
+            guard let switchedWorkspaceId, !switchedWorkspaceId.isEmpty else { return }
+            sidebarViewModel.clearCreatedSession()
+            sidebarViewModel.clearWorkspaceSwitch()
+            isSidebarPresented = false
+            onRequestAppReset()
+        }
+        .onChange(of: sidebarUiState?.createdSessionId) { createdSessionId in
+            guard let createdSessionId, !createdSessionId.isEmpty else { return }
+            guard sidebarUiState?.switchedWorkspaceId == nil else { return }
+            sidebarViewModel.clearCreatedSession()
+            withAnimation(.snappy(duration: 0.28)) {
+                isSidebarPresented = false
+            }
         }
         .onChange(of: scenePhase) { newPhase in
             switch newPhase {

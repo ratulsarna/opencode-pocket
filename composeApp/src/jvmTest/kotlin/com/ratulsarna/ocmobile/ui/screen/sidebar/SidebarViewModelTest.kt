@@ -170,8 +170,8 @@ class SidebarViewModelTest {
     }
 
     @Test
-    fun SidebarViewModel_switchWorkspacePersistsSessionIdBeforeActivating() = runTest(dispatcher) {
-        val activatedIds = mutableListOf<String>()
+    fun SidebarViewModel_switchWorkspaceActivatesBeforePersistingSessionId() = runTest(dispatcher) {
+        val operations = mutableListOf<String>()
         val appSettings = MockAppSettings()
         appSettings.setActiveServerId("server-1")
         appSettings.setInstallationIdForServer("server-1", "inst-1")
@@ -186,12 +186,13 @@ class SidebarViewModelTest {
             activeWorkspace = workspace1,
             appSettings = appSettings,
             activateHandler = { id ->
-                activatedIds.add(id)
+                operations.add("activate:$id")
                 Result.success(Unit)
             }
         )
         val sessionRepo = FakeSessionRepository(
             updateCurrentSessionIdHandler = { sessionId ->
+                operations.add("persist:$sessionId")
                 appSettings.setCurrentSessionId(sessionId)
                 Result.success(Unit)
             }
@@ -209,8 +210,42 @@ class SidebarViewModelTest {
 
         assertEquals("proj-2", appSettings.getActiveWorkspaceSnapshot()?.projectId)
         assertEquals("ses-target", appSettings.getCurrentSessionIdSnapshot())
-        assertEquals(listOf("proj-2"), activatedIds)
+        assertEquals(listOf("activate:proj-2", "persist:ses-target"), operations)
         assertEquals("proj-2", vm.uiState.value.switchedWorkspaceId)
+    }
+
+    @Test
+    fun SidebarViewModel_createSessionFailureInInactiveWorkspaceStillSignalsWorkspaceSwitch() = runTest(dispatcher) {
+        val workspace1 = workspace("proj-1", "/p1")
+        val workspace2 = workspace("proj-2", "/p2")
+        val appSettings = MockAppSettings()
+        appSettings.setActiveServerId("server-1")
+        appSettings.setInstallationIdForServer("server-1", "inst-1")
+        appSettings.setWorkspacesForInstallation("inst-1", listOf(workspace1, workspace2))
+        appSettings.setActiveWorkspace("inst-1", workspace1)
+
+        val repo = FakeWorkspaceRepository(
+            workspaces = listOf(workspace1, workspace2),
+            activeWorkspace = workspace1,
+            appSettings = appSettings
+        )
+        val sessionRepo = FakeSessionRepository(
+            createSessionHandler = { Result.failure(IllegalStateException("create failed")) }
+        )
+
+        val vm = SidebarViewModel(
+            workspaceRepository = repo,
+            sessionRepository = sessionRepo,
+            appSettings = appSettings
+        )
+        advanceUntilIdle()
+
+        vm.createSession("proj-2")
+        advanceUntilIdle()
+
+        assertEquals(false, vm.uiState.value.isCreatingSession)
+        assertEquals("proj-2", vm.uiState.value.switchedWorkspaceId)
+        assertEquals("proj-2", appSettings.getActiveWorkspaceSnapshot()?.projectId)
     }
 
     @Test
@@ -291,6 +326,29 @@ class SidebarViewModelTest {
         assertEquals("Workspace already exists", vm.uiState.value.workspaceCreationError)
     }
 
+    @Test
+    fun SidebarViewModel_refreshesWorkspacesAfterInitialization() = runTest(dispatcher) {
+        var refreshCount = 0
+        val workspace1 = workspace("proj-1", "/p1")
+        val repo = FakeWorkspaceRepository(
+            workspaces = listOf(workspace1),
+            activeWorkspace = workspace1,
+            refreshHandler = {
+                refreshCount += 1
+                Result.success(Unit)
+            }
+        )
+
+        SidebarViewModel(
+            workspaceRepository = repo,
+            sessionRepository = FakeSessionRepository(),
+            appSettings = MockAppSettings()
+        )
+        advanceUntilIdle()
+
+        assertEquals(1, refreshCount)
+    }
+
     private fun workspace(projectId: String, worktree: String, name: String? = null): Workspace =
         Workspace(projectId = projectId, worktree = worktree, name = name)
 
@@ -308,6 +366,7 @@ class SidebarViewModelTest {
         private val workspaces: List<Workspace> = emptyList(),
         private val activeWorkspace: Workspace? = null,
         private val appSettings: MockAppSettings? = null,
+        private val refreshHandler: suspend () -> Result<Unit> = { Result.success(Unit) },
         private val activateHandler: suspend (String) -> Result<Unit> = { Result.success(Unit) },
         private val addHandler: suspend (String) -> Result<Workspace> = { error("addWorkspace not configured") }
     ) : WorkspaceRepository {
@@ -316,10 +375,10 @@ class SidebarViewModelTest {
 
         override fun getWorkspaces(): Flow<List<Workspace>> = _workspaces
         override fun getActiveWorkspace(): Flow<Workspace?> = _active
-        override fun getActiveWorkspaceSnapshot(): Workspace? = activeWorkspace
+        override fun getActiveWorkspaceSnapshot(): Workspace? = _active.value
         override suspend fun ensureInitialized(): Result<Workspace> =
-            activeWorkspace?.let { Result.success(it) } ?: Result.failure(RuntimeException("no active"))
-        override suspend fun refresh(): Result<Unit> = Result.success(Unit)
+            _active.value?.let { Result.success(it) } ?: Result.failure(RuntimeException("no active"))
+        override suspend fun refresh(): Result<Unit> = refreshHandler()
         override suspend fun addWorkspace(directoryInput: String): Result<Workspace> = addHandler(directoryInput)
         override suspend fun activateWorkspace(projectId: String): Result<Unit> {
             val result = activateHandler(projectId)

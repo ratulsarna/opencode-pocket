@@ -37,6 +37,12 @@ class SidebarViewModel(
     private fun ensureInitialized() {
         viewModelScope.launch {
             workspaceRepository.ensureInitialized()
+                .onSuccess {
+                    workspaceRepository.refresh()
+                        .onFailure { error ->
+                            OcMobileLog.w(TAG, "Failed to refresh workspaces after initialization: ${error.message}")
+                        }
+                }
                 .onFailure { error ->
                     OcMobileLog.w(TAG, "Failed to initialize workspaces: ${error.message}")
                 }
@@ -219,7 +225,12 @@ class SidebarViewModel(
                 }
                 .onFailure { error ->
                     OcMobileLog.w(TAG, "Failed to create session: ${error.message}")
-                    _uiState.update { it.copy(isCreatingSession = false) }
+                    _uiState.update {
+                        it.copy(
+                            isCreatingSession = false,
+                            switchedWorkspaceId = if (!isActiveWorkspace) workspaceProjectId else null
+                        )
+                    }
                 }
         }
     }

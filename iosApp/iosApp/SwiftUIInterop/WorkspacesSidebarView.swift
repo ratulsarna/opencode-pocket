@@ -6,7 +6,6 @@ struct WorkspacesSidebarView: View {
     let viewModel: SidebarViewModel
     let onClose: () -> Void
     let onSelectSession: () -> Void
-    let onRequestAppReset: () -> Void
 
     @StateObject private var uiStateEvents = KmpUiEventBridge<SidebarUiState>()
     @State private var latestUiState: SidebarUiState?
@@ -17,6 +16,7 @@ struct WorkspacesSidebarView: View {
     @State private var pendingAddWorkspace = false
     @State private var addWorkspaceErrorMessage: String?
     @State private var isShowingAddWorkspaceError = false
+    @State private var hasSeededInitialExpansion = false
 
     var body: some View {
         Group {
@@ -53,8 +53,8 @@ struct WorkspacesSidebarView: View {
                 let previousState = latestUiState
                 latestUiState = state
 
-                // Auto-expand active workspace on first load
-                if expanded.isEmpty, let activeId = state.activeWorkspaceId {
+                if !hasSeededInitialExpansion, let activeId = state.activeWorkspaceId {
+                    hasSeededInitialExpansion = true
                     expanded.insert(activeId)
                     viewModel.loadSessionsForWorkspace(projectId: activeId)
                 }
@@ -76,19 +76,6 @@ struct WorkspacesSidebarView: View {
         }
         .onDisappear {
             uiStateEvents.stop()
-        }
-        .task(id: latestUiState?.switchedWorkspaceId ?? "") {
-            guard let switchedId = latestUiState?.switchedWorkspaceId, !switchedId.isEmpty else { return }
-            viewModel.clearWorkspaceSwitch()
-            onRequestAppReset()
-        }
-        .task(id: latestUiState?.createdSessionId ?? "") {
-            guard let sessionId = latestUiState?.createdSessionId, !sessionId.isEmpty else { return }
-            viewModel.clearCreatedSession()
-            if latestUiState?.switchedWorkspaceId != nil {
-                return
-            }
-            onSelectSession()
         }
     }
 
@@ -161,6 +148,7 @@ struct WorkspacesSidebarView: View {
             }
             .navigationTitle("Add Workspace")
             .navigationBarTitleDisplayMode(.inline)
+            .interactiveDismissDisabled(latestUiState?.isCreatingWorkspace == true)
             .alert("Couldn’t Add Workspace", isPresented: $isShowingAddWorkspaceError) {
                 Button("OK", role: .cancel) {
                     addWorkspaceErrorMessage = nil
