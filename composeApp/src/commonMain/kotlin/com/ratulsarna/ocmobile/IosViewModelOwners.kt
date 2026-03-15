@@ -14,6 +14,7 @@ import com.ratulsarna.ocmobile.ui.screen.docs.MarkdownFileViewerViewModel
 import com.ratulsarna.ocmobile.ui.screen.filebrowser.FileBrowserViewModel
 import com.ratulsarna.ocmobile.ui.screen.sessions.SessionsViewModel
 import com.ratulsarna.ocmobile.ui.screen.settings.SettingsViewModel
+import com.ratulsarna.ocmobile.ui.screen.sidebar.SidebarViewModel
 import com.ratulsarna.ocmobile.ui.screen.workspaces.WorkspacesViewModel
 
 /**
@@ -46,6 +47,9 @@ class IosAppViewModelOwner : ViewModelStoreOwner {
 
     /** Matches Compose `viewModel(key = "workspaces") { AppModule.createWorkspacesViewModel() }` */
     fun workspacesViewModel(): WorkspacesViewModel = get(key = "workspaces") { AppModule.createWorkspacesViewModel() }
+
+    /** App-scoped sidebar combining workspaces + sessions. */
+    fun sidebarViewModel(): SidebarViewModel = get(key = "sidebar") { AppModule.createSidebarViewModel() }
 
     /** App-scoped: used for onboarding/pairing flow. */
     fun connectViewModel(): ConnectViewModel = get(key = "connect") { AppModule.createConnectViewModel() }

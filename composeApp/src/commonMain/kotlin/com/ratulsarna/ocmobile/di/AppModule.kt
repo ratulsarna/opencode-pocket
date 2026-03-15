@@ -37,6 +37,7 @@ import com.ratulsarna.ocmobile.ui.screen.filebrowser.FileBrowserViewModel
 import com.ratulsarna.ocmobile.ui.screen.connect.ConnectViewModel
 import com.ratulsarna.ocmobile.ui.screen.sessions.SessionsViewModel
 import com.ratulsarna.ocmobile.ui.screen.settings.SettingsViewModel
+import com.ratulsarna.ocmobile.ui.screen.sidebar.SidebarViewModel
 import com.ratulsarna.ocmobile.ui.screen.workspaces.WorkspacesViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -257,6 +258,14 @@ object AppModule {
             permissionRepository = graphPermissionRepository(),
             serverRepository = serverRepository,
             workspaceRepository = graphWorkspaceRepository()
+        )
+    }
+
+    fun createSidebarViewModel(): SidebarViewModel {
+        return SidebarViewModel(
+            workspaceRepository = graphWorkspaceRepository(),
+            sessionRepository = graphSessionRepository(),
+            appSettings = appSettings
         )
     }
 
