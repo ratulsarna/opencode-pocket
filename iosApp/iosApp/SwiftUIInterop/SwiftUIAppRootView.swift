@@ -3,6 +3,7 @@ import ComposeApp
 import UIKit
 
 private enum SwiftUIAppRoute: Hashable {
+    case sidebar
     case connect
     case settings
     case modelSelection
@@ -17,7 +18,6 @@ struct SwiftUIAppRootView: View {
     @State private var markdownManager = MarkdownFlowStoreManager()
     @State private var path: [SwiftUIAppRoute] = []
     @Environment(\.scenePhase) private var scenePhase
-    @State private var sidebarVisibility: NavigationSplitViewVisibility = .detailOnly
     @State private var settingsUiState: SettingsUiState?
     @StateObject private var sidebarUiStateEvents = KmpUiEventBridge<SidebarUiState>()
     @State private var sidebarUiState: SidebarUiState?
@@ -68,70 +68,63 @@ struct SwiftUIAppRootView: View {
         let settingsViewModel = kmp.owner.settingsViewModel()
         let sidebarViewModel = kmp.owner.sidebarViewModel()
 
-        NavigationSplitView(columnVisibility: $sidebarVisibility) {
-            WorkspacesSidebarView(
-                viewModel: sidebarViewModel,
-                onSelectSession: {
-                    sidebarVisibility = .detailOnly
-                },
-                onRequestAppReset: { onRequestAppReset() }
-            )
-        } detail: {
-            NavigationStack(path: $path) {
-                Group {
-                    SwiftUIChatUIKitView(
-                        viewModel: chatViewModel,
-                        onOpenSettings: { path.append(.settings) },
-                        onToggleSidebar: {
-                            withAnimation {
-                                sidebarVisibility = sidebarVisibility == .detailOnly
-                                    ? .doubleColumn
-                                    : .detailOnly
-                            }
+        NavigationStack(path: $path) {
+            Group {
+                SwiftUIChatUIKitView(
+                    viewModel: chatViewModel,
+                    onOpenSettings: { path.append(.settings) },
+                    onToggleSidebar: { path.append(.sidebar) },
+                    onOpenFile: { openMarkdownFile($0) },
+                    sessionTitle: activeSessionTitle,
+                    workspacePath: settingsUiState?.activeWorkspaceWorktree
+                )
+            }
+            .navigationDestination(for: SwiftUIAppRoute.self) { route in
+                switch route {
+                case .sidebar:
+                    WorkspacesSidebarView(
+                        viewModel: sidebarViewModel,
+                        onSelectSession: {
+                            // Pop back to chat
+                            path.removeAll(where: { $0 == .sidebar })
                         },
-                        onOpenFile: { openMarkdownFile($0) },
-                        sessionTitle: activeSessionTitle,
-                        workspacePath: settingsUiState?.activeWorkspaceWorktree
+                        onRequestAppReset: { onRequestAppReset() }
                     )
-                }
-                .navigationDestination(for: SwiftUIAppRoute.self) { route in
-                    switch route {
-                    case .connect:
-                        SwiftUIConnectToOpenCodeView(
-                            viewModel: connectViewModel,
-                            onConnected: { onRequestAppReset() },
-                            onDisconnected: { onRequestAppReset() }
+
+                case .connect:
+                    SwiftUIConnectToOpenCodeView(
+                        viewModel: connectViewModel,
+                        onConnected: { onRequestAppReset() },
+                        onDisconnected: { onRequestAppReset() }
+                    )
+
+                case .settings:
+                    SwiftUISettingsView(
+                        viewModel: settingsViewModel,
+                        onOpenConnect: { path.append(.connect) },
+                        onOpenModelSelection: { path.append(.modelSelection) },
+                        themeRestartNotice: $showThemeRestartNotice
+                    )
+
+                case .modelSelection:
+                    SwiftUIModelSelectionView(viewModel: settingsViewModel)
+
+                case .markdownFile(let filePath, let openId):
+                    let key = MarkdownRouteKey(path: filePath, openId: openId)
+                    if let store = markdownManager.stores[key] {
+                        SwiftUIMarkdownFileViewerView(
+                            viewModel: store.owner.markdownFileViewerViewModel(path: filePath, openId: openId),
+                            onOpenFile: { openMarkdownFile($0) }
                         )
-
-                    case .settings:
-                        SwiftUISettingsView(
-                            viewModel: settingsViewModel,
-                            onOpenConnect: { path.append(.connect) },
-                            onOpenModelSelection: { path.append(.modelSelection) },
-                            themeRestartNotice: $showThemeRestartNotice
-                        )
-
-                    case .modelSelection:
-                        SwiftUIModelSelectionView(viewModel: settingsViewModel)
-
-                    case .markdownFile(let filePath, let openId):
-                        let key = MarkdownRouteKey(path: filePath, openId: openId)
-                        if let store = markdownManager.stores[key] {
-                            SwiftUIMarkdownFileViewerView(
-                                viewModel: store.owner.markdownFileViewerViewModel(path: filePath, openId: openId),
-                                onOpenFile: { openMarkdownFile($0) }
-                            )
-                        } else {
-                            SamFullScreenLoadingView(title: "Opening file…")
-                                .task {
-                                    markdownManager.ensureStore(for: key)
-                                }
-                        }
+                    } else {
+                        SamFullScreenLoadingView(title: "Opening file…")
+                            .task {
+                                markdownManager.ensureStore(for: key)
+                            }
                     }
                 }
             }
         }
-        .navigationSplitViewStyle(.balanced)
         .onAppear {
             IosThemeApplier.apply(style: desiredInterfaceStyle)
 

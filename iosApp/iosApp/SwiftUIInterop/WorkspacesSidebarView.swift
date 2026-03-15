@@ -7,7 +7,6 @@ struct WorkspacesSidebarView: View {
     let onSelectSession: () -> Void
     let onRequestAppReset: () -> Void
 
-    @Environment(\.dismiss) private var dismiss
     @StateObject private var uiStateEvents = KmpUiEventBridge<SidebarUiState>()
     @State private var latestUiState: SidebarUiState?
     @State private var expanded: Set<String> = []
@@ -106,7 +105,6 @@ struct WorkspacesSidebarView: View {
                             let isActiveWorkspace = projectId == state.activeWorkspaceId
                             if isActiveWorkspace {
                                 viewModel.switchSession(sessionId: sessionId)
-                                dismiss()
                                 onSelectSession()
                             } else {
                                 viewModel.switchWorkspace(projectId: projectId, sessionId: sessionId)
