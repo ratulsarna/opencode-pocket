@@ -76,10 +76,15 @@ class SidebarViewModel(
         val workspace = _uiState.value.workspaces.find { it.workspace.projectId == projectId } ?: return
         if (workspace.isLoading) return
 
-        _uiState.update { state ->
-            state.copy(workspaces = state.workspaces.map {
-                if (it.workspace.projectId == projectId) it.copy(isLoading = true, error = null) else it
-            })
+        // If sessions are already cached, show them immediately and refresh in background.
+        // Only show loading indicator on first fetch (no cached sessions).
+        val hasCachedSessions = workspace.sessions.isNotEmpty()
+        if (!hasCachedSessions) {
+            _uiState.update { state ->
+                state.copy(workspaces = state.workspaces.map {
+                    if (it.workspace.projectId == projectId) it.copy(isLoading = true, error = null) else it
+                })
+            }
         }
 
         viewModelScope.launch {
