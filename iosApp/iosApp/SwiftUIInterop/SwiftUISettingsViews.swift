@@ -6,8 +6,6 @@ struct SwiftUISettingsView: View {
     let viewModel: SettingsViewModel
     let onOpenConnect: () -> Void
     let onOpenModelSelection: () -> Void
-    let onOpenWorkspaces: () -> Void
-    let onOpenSessions: () -> Void
     @Binding var themeRestartNotice: Bool
 
     @State private var isShowingAgentSheet = false
@@ -52,23 +50,6 @@ struct SwiftUISettingsView: View {
                                 }
                                 .font(.caption)
                                 .foregroundColor(.secondary)
-                            }
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                                .foregroundColor(.secondary)
-                                .font(.caption)
-                        }
-                    }
-                    .buttonStyle(.plain)
-
-                    Button(action: onOpenWorkspaces) {
-                        HStack {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Workspace")
-                                    .foregroundColor(.primary)
-                                Text(workspaceText(name: uiState.activeWorkspaceName, worktree: uiState.activeWorkspaceWorktree))
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
                             }
                             Spacer()
                             Image(systemName: "chevron.right")
@@ -161,12 +142,6 @@ struct SwiftUISettingsView: View {
                         Text("Theme changes require restarting the app to fully apply.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
-                    }
-                }
-
-                Section("Navigation") {
-                    Button(action: onOpenSessions) {
-                        NavigationRowLabel(title: "Sessions", systemImage: "rectangle.stack")
                     }
                 }
 
@@ -333,20 +308,6 @@ struct SwiftUISettingsView: View {
         return "\(serverName) (\(endpoint))"
     }
 
-    private func workspaceText(name: String?, worktree: String?) -> String {
-        let workspaceName = (name ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-        let path = (worktree ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-
-        if path.isEmpty {
-            return "Server default (cwd)"
-        }
-
-        if workspaceName.isEmpty {
-            return path
-        }
-
-        return "\(workspaceName) · \(path)"
-    }
 }
 
 private struct NavigationRowLabel: View {
