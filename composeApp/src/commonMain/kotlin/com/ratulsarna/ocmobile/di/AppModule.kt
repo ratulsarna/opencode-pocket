@@ -35,10 +35,8 @@ import com.ratulsarna.ocmobile.ui.screen.chat.ChatViewModel
 import com.ratulsarna.ocmobile.ui.screen.docs.MarkdownFileViewerViewModel
 import com.ratulsarna.ocmobile.ui.screen.filebrowser.FileBrowserViewModel
 import com.ratulsarna.ocmobile.ui.screen.connect.ConnectViewModel
-import com.ratulsarna.ocmobile.ui.screen.sessions.SessionsViewModel
 import com.ratulsarna.ocmobile.ui.screen.settings.SettingsViewModel
 import com.ratulsarna.ocmobile.ui.screen.sidebar.SidebarViewModel
-import com.ratulsarna.ocmobile.ui.screen.workspaces.WorkspacesViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -269,13 +267,6 @@ object AppModule {
         )
     }
 
-    fun createSessionsViewModel(): SessionsViewModel {
-        return SessionsViewModel(
-            sessionRepository = graphSessionRepository(),
-            appSettings = appSettings
-        )
-    }
-
     fun createConnectViewModel(): ConnectViewModel {
         return ConnectViewModel(
             serverRepository = serverRepository,
@@ -293,10 +284,6 @@ object AppModule {
             appSettings = appSettings,
             workspaceRepository = graphWorkspaceRepository()
         )
-    }
-
-    fun createWorkspacesViewModel(): WorkspacesViewModel {
-        return WorkspacesViewModel(workspaceRepository = graphWorkspaceRepository())
     }
 
     fun createMarkdownFileViewerViewModel(path: String): MarkdownFileViewerViewModel {
