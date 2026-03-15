@@ -142,7 +142,7 @@ class SidebarViewModel(
                     _uiState.update { state ->
                         state.copy(workspaces = state.workspaces.map {
                             if (it.workspace.projectId == projectId) {
-                                it.copy(sessions = filtered, isLoading = false)
+                                it.copy(sessions = filtered, isLoading = false, error = null)
                             } else it
                         })
                     }
@@ -175,22 +175,39 @@ class SidebarViewModel(
     fun switchWorkspace(projectId: String, sessionId: String?) {
         if (_uiState.value.isSwitchingWorkspace) return
 
-        _uiState.update { it.copy(isSwitchingWorkspace = true) }
+        _uiState.update { it.copy(isSwitchingWorkspace = true, operationErrorMessage = null) }
 
         viewModelScope.launch {
             workspaceRepository.activateWorkspace(projectId)
                 .onSuccess {
                     if (sessionId != null) {
                         sessionRepository.updateCurrentSessionId(sessionId)
+                            .onSuccess {
+                                _uiState.update {
+                                    it.copy(isSwitchingWorkspace = false, switchedWorkspaceId = projectId)
+                                }
+                            }
                             .onFailure { error ->
                                 OcMobileLog.w(TAG, "Failed to persist session $sessionId for workspace $projectId: ${error.message}")
+                                _uiState.update {
+                                    it.copy(
+                                        isSwitchingWorkspace = false,
+                                        operationErrorMessage = error.message ?: "Failed to open session"
+                                    )
+                                }
                             }
+                    } else {
+                        _uiState.update { it.copy(isSwitchingWorkspace = false, switchedWorkspaceId = projectId) }
                     }
-                    _uiState.update { it.copy(isSwitchingWorkspace = false, switchedWorkspaceId = projectId) }
                 }
                 .onFailure { error ->
                     OcMobileLog.w(TAG, "Failed to switch workspace: ${error.message}")
-                    _uiState.update { it.copy(isSwitchingWorkspace = false) }
+                    _uiState.update {
+                        it.copy(
+                            isSwitchingWorkspace = false,
+                            operationErrorMessage = error.message ?: "Failed to switch workspace"
+                        )
+                    }
                 }
         }
     }
@@ -199,9 +216,13 @@ class SidebarViewModel(
         _uiState.update { it.copy(switchedWorkspaceId = null) }
     }
 
+    fun clearOperationError() {
+        _uiState.update { it.copy(operationErrorMessage = null) }
+    }
+
     fun createSession(workspaceProjectId: String) {
         if (_uiState.value.isCreatingSession) return
-        _uiState.update { it.copy(isCreatingSession = true) }
+        _uiState.update { it.copy(isCreatingSession = true, operationErrorMessage = null) }
 
         viewModelScope.launch {
             val isActiveWorkspace = workspaceProjectId == _uiState.value.activeWorkspaceId
@@ -210,7 +231,12 @@ class SidebarViewModel(
                 workspaceRepository.activateWorkspace(workspaceProjectId)
                     .onFailure { error ->
                         OcMobileLog.w(TAG, "Failed to switch workspace for new session: ${error.message}")
-                        _uiState.update { it.copy(isCreatingSession = false) }
+                        _uiState.update {
+                            it.copy(
+                                isCreatingSession = false,
+                                operationErrorMessage = error.message ?: "Failed to switch workspace"
+                            )
+                        }
                         return@launch
                     }
             }
@@ -228,7 +254,7 @@ class SidebarViewModel(
                     _uiState.update {
                         it.copy(
                             isCreatingSession = false,
-                            switchedWorkspaceId = if (!isActiveWorkspace) workspaceProjectId else null
+                            operationErrorMessage = error.message ?: "Failed to create session"
                         )
                     }
                 }
@@ -278,6 +304,7 @@ data class SidebarUiState(
     val isCreatingSession: Boolean = false,
     val isCreatingWorkspace: Boolean = false,
     val workspaceCreationError: String? = null,
+    val operationErrorMessage: String? = null,
     val isSwitchingWorkspace: Boolean = false,
     val switchedWorkspaceId: String? = null,
     val createdSessionId: String? = null

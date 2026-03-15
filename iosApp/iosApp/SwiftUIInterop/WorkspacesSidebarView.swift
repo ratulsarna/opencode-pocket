@@ -16,6 +16,8 @@ struct WorkspacesSidebarView: View {
     @State private var pendingAddWorkspace = false
     @State private var addWorkspaceErrorMessage: String?
     @State private var isShowingAddWorkspaceError = false
+    @State private var operationErrorMessage: String?
+    @State private var isShowingOperationError = false
     @State private var hasSeededInitialExpansion = false
 
     var body: some View {
@@ -72,6 +74,13 @@ struct WorkspacesSidebarView: View {
                         isShowingAddWorkspace = false
                     }
                 }
+
+                if let error = state.operationErrorMessage,
+                   !error.isEmpty,
+                   previousState?.operationErrorMessage != error {
+                    operationErrorMessage = error
+                    isShowingOperationError = true
+                }
             }
         }
         .onDisappear {
@@ -126,10 +135,19 @@ struct WorkspacesSidebarView: View {
                             viewModel.createSession(workspaceProjectId: projectId)
                         }
                     )
+                    .disabled(state.isSwitchingWorkspace)
                 }
             }
             .padding(.horizontal, 12)
             .padding(.top, 8)
+            .alert("Action Failed", isPresented: $isShowingOperationError) {
+                Button("OK", role: .cancel) {
+                    operationErrorMessage = nil
+                    viewModel.clearOperationError()
+                }
+            } message: {
+                Text(operationErrorMessage ?? "Something went wrong")
+            }
         }
     }
 

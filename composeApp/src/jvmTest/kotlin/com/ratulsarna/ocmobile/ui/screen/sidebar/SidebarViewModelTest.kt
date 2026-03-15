@@ -118,6 +118,42 @@ class SidebarViewModelTest {
     }
 
     @Test
+    fun SidebarViewModel_loadSessionsForWorkspaceClearsPreviousErrorAfterSuccess() = runTest(dispatcher) {
+        val workspace1 = workspace("proj-1", "/path/to/project-a")
+        var attempt = 0
+        val repo = FakeWorkspaceRepository(
+            workspaces = listOf(workspace1),
+            activeWorkspace = workspace1
+        )
+        val sessionRepo = FakeSessionRepository(
+            getSessionsHandler = { _, _, _, _ ->
+                attempt += 1
+                if (attempt == 1) {
+                    Result.failure(IllegalStateException("load failed"))
+                } else {
+                    Result.success(listOf(session("ses-1", "/path/to/project-a", updatedAtMs = 100)))
+                }
+            }
+        )
+
+        val vm = SidebarViewModel(
+            workspaceRepository = repo,
+            sessionRepository = sessionRepo,
+            appSettings = MockAppSettings()
+        )
+        advanceUntilIdle()
+
+        assertEquals("load failed", vm.uiState.value.workspaces.first().error)
+
+        vm.loadSessionsForWorkspace("proj-1")
+        advanceUntilIdle()
+
+        val workspace = vm.uiState.value.workspaces.first()
+        assertEquals(null, workspace.error)
+        assertEquals(listOf("ses-1"), workspace.sessions.map { it.id })
+    }
+
+    @Test
     fun SidebarViewModel_switchSessionCallsRepository() = runTest(dispatcher) {
         val repo = FakeWorkspaceRepository(
             workspaces = listOf(workspace("proj-1", "/p")),
@@ -215,6 +251,39 @@ class SidebarViewModelTest {
     }
 
     @Test
+    fun SidebarViewModel_switchWorkspaceExposesSessionPersistenceFailure() = runTest(dispatcher) {
+        val workspace1 = workspace("proj-1", "/p1")
+        val workspace2 = workspace("proj-2", "/p2")
+        val appSettings = MockAppSettings()
+        appSettings.setActiveServerId("server-1")
+        appSettings.setInstallationIdForServer("server-1", "inst-1")
+        appSettings.setWorkspacesForInstallation("inst-1", listOf(workspace1, workspace2))
+        appSettings.setActiveWorkspace("inst-1", workspace1)
+
+        val vm = SidebarViewModel(
+            workspaceRepository = FakeWorkspaceRepository(
+                workspaces = listOf(workspace1, workspace2),
+                activeWorkspace = workspace1,
+                appSettings = appSettings
+            ),
+            sessionRepository = FakeSessionRepository(
+                updateCurrentSessionIdHandler = {
+                    Result.failure(IllegalStateException("persist failed"))
+                }
+            ),
+            appSettings = appSettings
+        )
+        advanceUntilIdle()
+
+        vm.switchWorkspace("proj-2", "ses-target")
+        advanceUntilIdle()
+
+        assertEquals(false, vm.uiState.value.isSwitchingWorkspace)
+        assertEquals(null, vm.uiState.value.switchedWorkspaceId)
+        assertEquals("persist failed", vm.uiState.value.operationErrorMessage)
+    }
+
+    @Test
     fun SidebarViewModel_createSessionFailureInInactiveWorkspaceStillSignalsWorkspaceSwitch() = runTest(dispatcher) {
         val workspace1 = workspace("proj-1", "/p1")
         val workspace2 = workspace("proj-2", "/p2")
@@ -244,8 +313,33 @@ class SidebarViewModelTest {
         advanceUntilIdle()
 
         assertEquals(false, vm.uiState.value.isCreatingSession)
-        assertEquals("proj-2", vm.uiState.value.switchedWorkspaceId)
+        assertEquals(null, vm.uiState.value.switchedWorkspaceId)
+        assertEquals("create failed", vm.uiState.value.operationErrorMessage)
         assertEquals("proj-2", appSettings.getActiveWorkspaceSnapshot()?.projectId)
+    }
+
+    @Test
+    fun SidebarViewModel_clearOperationErrorRemovesMessage() = runTest(dispatcher) {
+        val workspace1 = workspace("proj-1", "/p1")
+        val vm = SidebarViewModel(
+            workspaceRepository = FakeWorkspaceRepository(
+                workspaces = listOf(workspace1),
+                activeWorkspace = workspace1
+            ),
+            sessionRepository = FakeSessionRepository(
+                createSessionHandler = { Result.failure(IllegalStateException("create failed")) }
+            ),
+            appSettings = MockAppSettings()
+        )
+        advanceUntilIdle()
+
+        vm.createSession("proj-1")
+        advanceUntilIdle()
+        assertEquals("create failed", vm.uiState.value.operationErrorMessage)
+
+        vm.clearOperationError()
+
+        assertEquals(null, vm.uiState.value.operationErrorMessage)
     }
 
     @Test
