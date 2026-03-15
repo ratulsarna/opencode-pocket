@@ -101,7 +101,7 @@ private class FakeSessionRepository : SessionRepository {
         )
     )
 
-    override suspend fun getSessions(search: String?, limit: Int?, start: Long?): Result<List<Session>> =
+    override suspend fun getSessions(search: String?, limit: Int?, start: Long?, directory: String?): Result<List<Session>> =
         Result.success(emptyList())
 
     override suspend fun createSession(title: String?, parentId: String?): Result<Session> =

@@ -4,6 +4,7 @@ import ComposeApp
 @MainActor
 struct WorkspacesSidebarView: View {
     let viewModel: SidebarViewModel
+    let onClose: () -> Void
     let onSelectSession: () -> Void
     let onRequestAppReset: () -> Void
 
@@ -24,6 +25,12 @@ struct WorkspacesSidebarView: View {
         }
         .navigationTitle("Workspaces")
         .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                Button(action: onClose) {
+                    Image(systemName: "chevron.left")
+                }
+            }
+
             ToolbarItem(placement: .topBarTrailing) {
                 if let state = latestUiState, state.isCreatingWorkspace {
                     ProgressView()

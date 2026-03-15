@@ -60,6 +60,8 @@ class SidebarViewModel(
                         }
                     )
                 }
+
+                active?.projectId?.let(::loadSessionsForWorkspace)
             }
         }
     }
@@ -67,8 +69,36 @@ class SidebarViewModel(
     private fun observeActiveSessionId() {
         viewModelScope.launch {
             appSettings.getCurrentSessionId().collect { id ->
-                _uiState.update { it.copy(activeSessionId = id) }
+                _uiState.update {
+                    it.copy(
+                        activeSessionId = id,
+                        activeSessionTitle = null
+                    )
+                }
+
+                loadActiveSessionTitle(sessionId = id)
             }
+        }
+    }
+
+    private fun loadActiveSessionTitle(sessionId: String?) {
+        if (sessionId.isNullOrBlank()) {
+            _uiState.update { it.copy(activeSessionTitle = null) }
+            return
+        }
+
+        viewModelScope.launch {
+            sessionRepository.getSession(sessionId)
+                .onSuccess { session ->
+                    if (sessionId != _uiState.value.activeSessionId) return@onSuccess
+
+                    _uiState.update {
+                        it.copy(activeSessionTitle = session.title?.takeIf(String::isNotBlank))
+                    }
+                }
+                .onFailure { error ->
+                    OcMobileLog.w(TAG, "Failed to load active session title for $sessionId: ${error.message}")
+                }
         }
     }
 
@@ -82,14 +112,23 @@ class SidebarViewModel(
         if (!hasCachedSessions) {
             _uiState.update { state ->
                 state.copy(workspaces = state.workspaces.map {
-                    if (it.workspace.projectId == projectId) it.copy(isLoading = true, error = null) else it
+                    if (it.workspace.projectId == projectId) {
+                        it.copy(isLoading = true, error = null)
+                    } else {
+                        it
+                    }
                 })
             }
         }
 
         viewModelScope.launch {
             val start = Clock.System.now().toEpochMilliseconds() - DEFAULT_RECENT_WINDOW_MS
-            sessionRepository.getSessions(search = null, limit = null, start = start)
+            sessionRepository.getSessions(
+                search = null,
+                limit = null,
+                start = start,
+                directory = workspace.workspace.worktree
+            )
                 .onSuccess { allSessions ->
                     val filtered = allSessions
                         .filter { it.parentId == null && it.directory == workspace.workspace.worktree }
@@ -107,7 +146,10 @@ class SidebarViewModel(
                     _uiState.update { state ->
                         state.copy(workspaces = state.workspaces.map {
                             if (it.workspace.projectId == projectId) {
-                                it.copy(isLoading = false, error = error.message ?: "Failed to load sessions")
+                                it.copy(
+                                    isLoading = false,
+                                    error = error.message ?: "Failed to load sessions"
+                                )
                             } else it
                         })
                     }
@@ -130,11 +172,14 @@ class SidebarViewModel(
         _uiState.update { it.copy(isSwitchingWorkspace = true) }
 
         viewModelScope.launch {
-            if (sessionId != null) {
-                appSettings.setCurrentSessionId(sessionId)
-            }
             workspaceRepository.activateWorkspace(projectId)
                 .onSuccess {
+                    if (sessionId != null) {
+                        sessionRepository.updateCurrentSessionId(sessionId)
+                            .onFailure { error ->
+                                OcMobileLog.w(TAG, "Failed to persist session $sessionId for workspace $projectId: ${error.message}")
+                            }
+                    }
                     _uiState.update { it.copy(isSwitchingWorkspace = false, switchedWorkspaceId = projectId) }
                 }
                 .onFailure { error ->
@@ -213,6 +258,7 @@ data class SidebarUiState(
     val workspaces: List<WorkspaceWithSessions> = emptyList(),
     val activeWorkspaceId: String? = null,
     val activeSessionId: String? = null,
+    val activeSessionTitle: String? = null,
     val isCreatingSession: Boolean = false,
     val isCreatingWorkspace: Boolean = false,
     val isSwitchingWorkspace: Boolean = false,

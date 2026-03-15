@@ -59,6 +59,7 @@ struct SwiftUIChatUIKitView: View {
                         Spacer(minLength: 0)
                         composerOverlay(state: state, safeBottomInset: keyboardAwareBottomInset(proxy.safeAreaInsets.bottom))
                     }
+                    .zIndex(1)
                 }
             }
             .ignoresSafeArea(.container)

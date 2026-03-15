@@ -81,6 +81,43 @@ class SidebarViewModelTest {
     }
 
     @Test
+    fun SidebarViewModel_loadSessionsForWorkspaceUsesWorkspaceDirectory() = runTest(dispatcher) {
+        val workspace1 = workspace("proj-1", "/path/to/project-a")
+        val workspace2 = workspace("proj-2", "/path/to/project-b")
+        val requestedDirectories = mutableListOf<String?>()
+        val repo = FakeWorkspaceRepository(
+            workspaces = listOf(workspace1, workspace2),
+            activeWorkspace = workspace1
+        )
+        val sessionRepo = FakeSessionRepository(
+            getSessionsHandler = { _, _, _, directory ->
+                requestedDirectories.add(directory)
+                Result.success(
+                    listOf(
+                        session("ses-b", "/path/to/project-b", updatedAtMs = 200),
+                        session("ses-a", "/path/to/project-a", updatedAtMs = 100)
+                    )
+                )
+            }
+        )
+        val appSettings = MockAppSettings()
+
+        val vm = SidebarViewModel(
+            workspaceRepository = repo,
+            sessionRepository = sessionRepo,
+            appSettings = appSettings
+        )
+        advanceUntilIdle()
+
+        vm.loadSessionsForWorkspace("proj-2")
+        advanceUntilIdle()
+
+        val loaded = vm.uiState.value.workspaces.first { it.workspace.projectId == "proj-2" }
+        assertEquals(listOf<String?>("/path/to/project-a", "/path/to/project-b"), requestedDirectories)
+        assertEquals(listOf("ses-b"), loaded.sessions.map { it.id })
+    }
+
+    @Test
     fun SidebarViewModel_switchSessionCallsRepository() = runTest(dispatcher) {
         val repo = FakeWorkspaceRepository(
             workspaces = listOf(workspace("proj-1", "/p")),
@@ -109,18 +146,56 @@ class SidebarViewModelTest {
     }
 
     @Test
+    fun SidebarViewModel_loadsActiveSessionTitleFromRepository() = runTest(dispatcher) {
+        val repo = FakeWorkspaceRepository(
+            workspaces = listOf(workspace("proj-1", "/p1")),
+            activeWorkspace = workspace("proj-1", "/p1")
+        )
+        val appSettings = MockAppSettings()
+        appSettings.setCurrentSessionId("ses-target")
+        val sessionRepo = FakeSessionRepository(
+            getSessionHandler = { sessionId ->
+                Result.success(session(sessionId, "/p1", updatedAtMs = 1).copy(title = "My session title"))
+            }
+        )
+
+        val vm = SidebarViewModel(
+            workspaceRepository = repo,
+            sessionRepository = sessionRepo,
+            appSettings = appSettings
+        )
+        advanceUntilIdle()
+
+        assertEquals("My session title", vm.uiState.value.activeSessionTitle)
+    }
+
+    @Test
     fun SidebarViewModel_switchWorkspacePersistsSessionIdBeforeActivating() = runTest(dispatcher) {
         val activatedIds = mutableListOf<String>()
+        val appSettings = MockAppSettings()
+        appSettings.setActiveServerId("server-1")
+        appSettings.setInstallationIdForServer("server-1", "inst-1")
+
+        val workspace1 = workspace("proj-1", "/p1")
+        val workspace2 = workspace("proj-2", "/p2")
+        appSettings.setWorkspacesForInstallation("inst-1", listOf(workspace1, workspace2))
+        appSettings.setActiveWorkspace("inst-1", workspace1)
+
         val repo = FakeWorkspaceRepository(
-            workspaces = listOf(workspace("proj-1", "/p1"), workspace("proj-2", "/p2")),
-            activeWorkspace = workspace("proj-1", "/p1"),
+            workspaces = listOf(workspace1, workspace2),
+            activeWorkspace = workspace1,
+            appSettings = appSettings,
             activateHandler = { id ->
                 activatedIds.add(id)
                 Result.success(Unit)
             }
         )
-        val sessionRepo = FakeSessionRepository()
-        val appSettings = MockAppSettings()
+        val sessionRepo = FakeSessionRepository(
+            updateCurrentSessionIdHandler = { sessionId ->
+                appSettings.setCurrentSessionId(sessionId)
+                Result.success(Unit)
+            }
+        )
 
         val vm = SidebarViewModel(
             workspaceRepository = repo,
@@ -132,6 +207,7 @@ class SidebarViewModelTest {
         vm.switchWorkspace("proj-2", "ses-target")
         advanceUntilIdle()
 
+        assertEquals("proj-2", appSettings.getActiveWorkspaceSnapshot()?.projectId)
         assertEquals("ses-target", appSettings.getCurrentSessionIdSnapshot())
         assertEquals(listOf("proj-2"), activatedIds)
         assertEquals("proj-2", vm.uiState.value.switchedWorkspaceId)
@@ -206,6 +282,7 @@ class SidebarViewModelTest {
     private class FakeWorkspaceRepository(
         private val workspaces: List<Workspace> = emptyList(),
         private val activeWorkspace: Workspace? = null,
+        private val appSettings: MockAppSettings? = null,
         private val activateHandler: suspend (String) -> Result<Unit> = { Result.success(Unit) },
         private val addHandler: suspend (String) -> Result<Workspace> = { error("addWorkspace not configured") }
     ) : WorkspaceRepository {
@@ -219,18 +296,43 @@ class SidebarViewModelTest {
             activeWorkspace?.let { Result.success(it) } ?: Result.failure(RuntimeException("no active"))
         override suspend fun refresh(): Result<Unit> = Result.success(Unit)
         override suspend fun addWorkspace(directoryInput: String): Result<Workspace> = addHandler(directoryInput)
-        override suspend fun activateWorkspace(projectId: String): Result<Unit> = activateHandler(projectId)
+        override suspend fun activateWorkspace(projectId: String): Result<Unit> {
+            val result = activateHandler(projectId)
+            if (result.isSuccess) {
+                val workspace = _workspaces.value.firstOrNull { it.projectId == projectId }
+                    ?: return Result.failure(IllegalArgumentException("Workspace not found: $projectId"))
+                _active.value = workspace
+                appSettings?.setActiveWorkspace("inst-1", workspace)
+            }
+            return result
+        }
     }
 
     private class FakeSessionRepository(
         private val sessions: List<Session> = emptyList(),
+        private val getSessionHandler: suspend (String) -> Result<Session> = { sessionId ->
+            val instant = Instant.fromEpochMilliseconds(0)
+            Result.success(
+                Session(
+                    id = sessionId,
+                    directory = "/unused",
+                    title = sessionId,
+                    createdAt = instant,
+                    updatedAt = instant,
+                    parentId = null
+                )
+            )
+        },
+        private val getSessionsHandler: suspend (String?, Int?, Long?, String?) -> Result<List<Session>> = { _, _, _, _ ->
+            Result.success(sessions)
+        },
         private val createSessionHandler: suspend () -> Result<Session> = { error("createSession not configured") },
         private val updateCurrentSessionIdHandler: suspend (String) -> Result<Unit> = { Result.success(Unit) }
     ) : SessionRepository {
         override suspend fun getCurrentSessionId(): Result<String> = Result.success("ses-current")
-        override suspend fun getSession(sessionId: String): Result<Session> = error("not used")
-        override suspend fun getSessions(search: String?, limit: Int?, start: Long?): Result<List<Session>> =
-            Result.success(sessions)
+        override suspend fun getSession(sessionId: String): Result<Session> = getSessionHandler(sessionId)
+        override suspend fun getSessions(search: String?, limit: Int?, start: Long?, directory: String?): Result<List<Session>> =
+            getSessionsHandler(search, limit, start, directory)
         override suspend fun createSession(title: String?, parentId: String?): Result<Session> = createSessionHandler()
         override suspend fun forkSession(sessionId: String, messageId: String?): Result<Session> = error("not used")
         override suspend fun revertSession(sessionId: String, messageId: String): Result<Session> = error("not used")

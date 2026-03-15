@@ -81,9 +81,9 @@ class SessionRepositoryImpl(
         }
     }
 
-    override suspend fun getSessions(search: String?, limit: Int?, start: Long?): Result<List<Session>> {
+    override suspend fun getSessions(search: String?, limit: Int?, start: Long?, directory: String?): Result<List<Session>> {
         return runCatching {
-            api.getSessions(search = search, limit = limit, start = start).map { it.toDomain() }
+            api.getSessions(search = search, limit = limit, start = start, directory = directory).map { it.toDomain() }
         }.recoverCatching { e ->
             when (e) {
                 is ClientRequestException -> {

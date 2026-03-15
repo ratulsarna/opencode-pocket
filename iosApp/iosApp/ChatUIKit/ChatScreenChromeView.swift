@@ -40,68 +40,65 @@ struct ChatToolbarGlassView: View {
     }
 
     var body: some View {
-        chatGlassGrouping(spacing: 16) {
-            VStack(spacing: 10) {
-                VStack(spacing: 0) {
-                    HStack(alignment: .center, spacing: 12) {
-                        ChatToolbarIconButton(action: onToggleSidebar) {
-                            Image(systemName: "line.3.horizontal")
-                        }
+        VStack(spacing: 10) {
+            VStack(spacing: 0) {
+                HStack(alignment: .center, spacing: 12) {
+                    ChatToolbarIconButton(action: onToggleSidebar) {
+                        Image(systemName: "line.3.horizontal")
+                    }
 
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(sessionTitle ?? "OpenCode")
-                                .font(.system(.title3, design: .rounded).weight(.semibold))
-                                .foregroundStyle(.primary)
-                                .lineLimit(1)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(sessionTitle ?? "OpenCode")
+                            .font(.system(.title3, design: .rounded).weight(.semibold))
+                            .foregroundStyle(.primary)
+                            .lineLimit(1)
 
-                            Text(subtitle)
-                                .font(.system(.caption, design: .monospaced))
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
-                        }
+                        Text(subtitle)
+                            .font(.system(.caption, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
 
-                        Spacer(minLength: 0)
-
-                        HStack(spacing: 8) {
-                            ChatToolbarIconButton(action: onRetry) {
-                                if isRefreshing {
-                                    ProgressView()
-                                        .controlSize(.small)
-                                } else {
-                                    Image(systemName: "arrow.clockwise")
-                                }
-                            }
-                            .disabled(isRefreshing)
-
-                            ChatToolbarIconButton(action: onOpenSettings) {
-                                Image(systemName: "gearshape")
+                    HStack(spacing: 10) {
+                        ChatToolbarIconButton(action: onRetry) {
+                            if isRefreshing {
+                                ProgressView()
+                                    .controlSize(.small)
+                            } else {
+                                Image(systemName: "arrow.clockwise")
                             }
                         }
-                    }
-                    .padding(.horizontal, 14)
-                    .padding(.top, 9)
-                    .padding(.bottom, showProcessingBar ? 7 : 9)
+                        .disabled(isRefreshing)
 
-                    if showProcessingBar {
-                        ChatToolbarProcessingBar()
-                            .padding(.horizontal, 14)
-                            .padding(.bottom, 9)
+                        ChatToolbarIconButton(action: onOpenSettings) {
+                            Image(systemName: "gearshape")
+                        }
                     }
                 }
+                .padding(.horizontal, 14)
+                .padding(.top, 9)
+                .padding(.bottom, showProcessingBar ? 7 : 9)
 
-                if isReconnecting {
-                    ChatStatusBanner(title: "Reconnecting", message: "Trying to restore the stream.")
+                if showProcessingBar {
+                    ChatToolbarProcessingBar()
+                        .padding(.horizontal, 14)
+                        .padding(.bottom, 9)
                 }
+            }
 
-                if let error = state.error {
-                    ChatErrorBanner(
-                        message: error.message ?? "An error occurred.",
-                        showRevert: shouldShowRevert,
-                        onDismiss: onDismissError,
-                        onRetry: onRetry,
-                        onRevert: onRevert
-                    )
-                }
+            if isReconnecting {
+                ChatStatusBanner(title: "Reconnecting", message: "Trying to restore the stream.")
+            }
+
+            if let error = state.error {
+                ChatErrorBanner(
+                    message: error.message ?? "An error occurred.",
+                    showRevert: shouldShowRevert,
+                    onDismiss: onDismissError,
+                    onRetry: onRetry,
+                    onRevert: onRevert
+                )
             }
         }
     }
@@ -336,6 +333,7 @@ private struct ChatToolbarIconButton<Label: View>: View {
                     .font(.system(size: 14, weight: .medium))
                     .foregroundStyle(.primary)
                     .frame(width: 34, height: 34)
+                    .contentShape(Circle())
                     .chatGlassCircle(tint: Color.white.opacity(0.01))
             }
             .buttonStyle(.plain)

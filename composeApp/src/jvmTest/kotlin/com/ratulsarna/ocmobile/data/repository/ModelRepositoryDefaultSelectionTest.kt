@@ -98,7 +98,7 @@ class ModelRepositoryDefaultSelectionTest {
         override suspend fun sendMessage(sessionId: String, request: SendMessageRequest): SendMessageResponse = TODO()
         override suspend fun getMessages(sessionId: String, limit: Int?, reverse: Boolean?): List<MessageWithPartsDto> = TODO()
         override suspend fun getSession(sessionId: String): SessionDto = TODO()
-        override suspend fun getSessions(search: String?, limit: Int?, start: Long?): List<SessionDto> = TODO()
+        override suspend fun getSessions(search: String?, limit: Int?, start: Long?, directory: String?): List<SessionDto> = TODO()
         override suspend fun createSession(request: CreateSessionRequest): SessionDto = TODO()
         override suspend fun forkSession(sessionId: String, request: ForkSessionRequest): SessionDto = TODO()
         override suspend fun revertSession(sessionId: String, request: RevertSessionRequest): SessionDto = TODO()
@@ -117,4 +117,3 @@ class ModelRepositoryDefaultSelectionTest {
         override suspend fun sendCommand(sessionId: String, request: SendCommandRequest): SendMessageResponse = TODO()
     }
 }
-
