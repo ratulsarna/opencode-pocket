@@ -230,16 +230,21 @@ class SidebarViewModel(
 
     fun addWorkspace(directoryInput: String) {
         if (_uiState.value.isCreatingWorkspace) return
-        _uiState.update { it.copy(isCreatingWorkspace = true) }
+        _uiState.update { it.copy(isCreatingWorkspace = true, workspaceCreationError = null) }
 
         viewModelScope.launch {
             workspaceRepository.addWorkspace(directoryInput)
                 .onSuccess {
-                    _uiState.update { it.copy(isCreatingWorkspace = false) }
+                    _uiState.update { it.copy(isCreatingWorkspace = false, workspaceCreationError = null) }
                 }
                 .onFailure { error ->
                     OcMobileLog.w(TAG, "Failed to add workspace: ${error.message}")
-                    _uiState.update { it.copy(isCreatingWorkspace = false) }
+                    _uiState.update {
+                        it.copy(
+                            isCreatingWorkspace = false,
+                            workspaceCreationError = error.message ?: "Failed to add workspace"
+                        )
+                    }
                 }
         }
     }
@@ -261,6 +266,7 @@ data class SidebarUiState(
     val activeSessionTitle: String? = null,
     val isCreatingSession: Boolean = false,
     val isCreatingWorkspace: Boolean = false,
+    val workspaceCreationError: String? = null,
     val isSwitchingWorkspace: Boolean = false,
     val switchedWorkspaceId: String? = null,
     val createdSessionId: String? = null

@@ -14,6 +14,9 @@ struct WorkspacesSidebarView: View {
     @State private var fullyExpanded: Set<String> = []
     @State private var isShowingAddWorkspace = false
     @State private var draftDirectory = ""
+    @State private var pendingAddWorkspace = false
+    @State private var addWorkspaceErrorMessage: String?
+    @State private var isShowingAddWorkspaceError = false
 
     var body: some View {
         Group {
@@ -47,12 +50,27 @@ struct WorkspacesSidebarView: View {
         }
         .onAppear {
             uiStateEvents.start(flow: viewModel.uiState) { state in
+                let previousState = latestUiState
                 latestUiState = state
 
                 // Auto-expand active workspace on first load
                 if expanded.isEmpty, let activeId = state.activeWorkspaceId {
                     expanded.insert(activeId)
                     viewModel.loadSessionsForWorkspace(projectId: activeId)
+                }
+
+                if pendingAddWorkspace,
+                   !state.isCreatingWorkspace,
+                   previousState?.isCreatingWorkspace == true {
+                    pendingAddWorkspace = false
+
+                    if let error = state.workspaceCreationError, !error.isEmpty {
+                        addWorkspaceErrorMessage = error
+                        isShowingAddWorkspaceError = true
+                    } else {
+                        draftDirectory = ""
+                        isShowingAddWorkspace = false
+                    }
                 }
             }
         }
@@ -136,28 +154,41 @@ struct WorkspacesSidebarView: View {
                     TextField("Directory path", text: $draftDirectory)
                         .autocorrectionDisabled()
                         .textInputAutocapitalization(.never)
+                        .disabled(latestUiState?.isCreatingWorkspace == true)
                 } footer: {
                     Text("Enter the full directory path on the server machine.")
                 }
             }
             .navigationTitle("Add Workspace")
             .navigationBarTitleDisplayMode(.inline)
+            .alert("Couldn’t Add Workspace", isPresented: $isShowingAddWorkspaceError) {
+                Button("OK", role: .cancel) {
+                    addWorkspaceErrorMessage = nil
+                }
+            } message: {
+                Text(addWorkspaceErrorMessage ?? "Failed to add workspace")
+            }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
                         draftDirectory = ""
+                        pendingAddWorkspace = false
+                        addWorkspaceErrorMessage = nil
                         isShowingAddWorkspace = false
                     }
+                    .disabled(latestUiState?.isCreatingWorkspace == true)
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
                         let trimmed = draftDirectory.trimmingCharacters(in: .whitespacesAndNewlines)
                         guard !trimmed.isEmpty else { return }
+                        pendingAddWorkspace = true
                         viewModel.addWorkspace(directoryInput: trimmed)
-                        draftDirectory = ""
-                        isShowingAddWorkspace = false
                     }
-                    .disabled(draftDirectory.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .disabled(
+                        draftDirectory.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+                        latestUiState?.isCreatingWorkspace == true
+                    )
                 }
             }
         }

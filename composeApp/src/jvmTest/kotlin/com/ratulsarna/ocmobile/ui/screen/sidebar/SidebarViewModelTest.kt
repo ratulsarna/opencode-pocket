@@ -264,6 +264,31 @@ class SidebarViewModelTest {
 
         assertEquals(listOf("/new/path"), addedDirs)
         assertEquals(false, vm.uiState.value.isCreatingWorkspace)
+        assertEquals(null, vm.uiState.value.workspaceCreationError)
+    }
+
+    @Test
+    fun SidebarViewModel_addWorkspaceExposesFailure() = runTest(dispatcher) {
+        val repo = FakeWorkspaceRepository(
+            workspaces = emptyList(),
+            activeWorkspace = null,
+            addHandler = { Result.failure(IllegalStateException("Workspace already exists")) }
+        )
+        val sessionRepo = FakeSessionRepository()
+        val appSettings = MockAppSettings()
+
+        val vm = SidebarViewModel(
+            workspaceRepository = repo,
+            sessionRepository = sessionRepo,
+            appSettings = appSettings
+        )
+        advanceUntilIdle()
+
+        vm.addWorkspace("/existing/path")
+        advanceUntilIdle()
+
+        assertEquals(false, vm.uiState.value.isCreatingWorkspace)
+        assertEquals("Workspace already exists", vm.uiState.value.workspaceCreationError)
     }
 
     private fun workspace(projectId: String, worktree: String, name: String? = null): Workspace =
