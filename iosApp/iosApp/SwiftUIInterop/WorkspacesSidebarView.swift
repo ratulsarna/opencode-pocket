@@ -126,7 +126,6 @@ struct WorkspacesSidebarView: View {
                             let isActiveWorkspace = projectId == state.activeWorkspaceId
                             if isActiveWorkspace {
                                 viewModel.switchSession(sessionId: sessionId)
-                                onSelectSession()
                             } else {
                                 viewModel.switchWorkspace(projectId: projectId, sessionId: sessionId)
                             }
@@ -135,7 +134,7 @@ struct WorkspacesSidebarView: View {
                             viewModel.createSession(workspaceProjectId: projectId)
                         }
                     )
-                    .disabled(state.isSwitchingWorkspace)
+                    .disabled(state.isSwitchingWorkspace || state.isSwitchingSession)
                 }
             }
             .padding(.horizontal, 12)

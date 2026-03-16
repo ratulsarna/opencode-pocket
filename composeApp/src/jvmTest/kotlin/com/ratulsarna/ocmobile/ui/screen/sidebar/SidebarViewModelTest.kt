@@ -154,6 +154,35 @@ class SidebarViewModelTest {
     }
 
     @Test
+    fun SidebarViewModel_loadSessionsForWorkspaceSkipsOverlappingRefreshes() = runTest(dispatcher) {
+        val workspace1 = workspace("proj-1", "/path/to/project-a")
+        var requestCount = 0
+        val repo = FakeWorkspaceRepository(
+            workspaces = listOf(workspace1),
+            activeWorkspace = workspace1
+        )
+        val sessionRepo = FakeSessionRepository(
+            getSessionsHandler = { _, _, _, _ ->
+                requestCount += 1
+                Result.success(listOf(session("ses-1", "/path/to/project-a", updatedAtMs = 100)))
+            }
+        )
+
+        val vm = SidebarViewModel(
+            workspaceRepository = repo,
+            sessionRepository = sessionRepo,
+            appSettings = MockAppSettings()
+        )
+        advanceUntilIdle()
+
+        vm.loadSessionsForWorkspace("proj-1")
+        vm.loadSessionsForWorkspace("proj-1")
+        advanceUntilIdle()
+
+        assertEquals(2, requestCount)
+    }
+
+    @Test
     fun SidebarViewModel_switchSessionCallsRepository() = runTest(dispatcher) {
         val repo = FakeWorkspaceRepository(
             workspaces = listOf(workspace("proj-1", "/p")),
@@ -179,6 +208,60 @@ class SidebarViewModelTest {
         advanceUntilIdle()
 
         assertEquals(listOf("ses-target"), updatedIds)
+        assertEquals(false, vm.uiState.value.isSwitchingSession)
+        assertEquals("ses-target", vm.uiState.value.switchedSessionId)
+    }
+
+    @Test
+    fun SidebarViewModel_switchSessionExposesFailure() = runTest(dispatcher) {
+        val vm = SidebarViewModel(
+            workspaceRepository = FakeWorkspaceRepository(
+                workspaces = listOf(workspace("proj-1", "/p")),
+                activeWorkspace = workspace("proj-1", "/p")
+            ),
+            sessionRepository = FakeSessionRepository(
+                updateCurrentSessionIdHandler = {
+                    Result.failure(IllegalStateException("switch failed"))
+                }
+            ),
+            appSettings = MockAppSettings()
+        )
+        advanceUntilIdle()
+
+        vm.switchSession("ses-target")
+        advanceUntilIdle()
+
+        assertEquals(false, vm.uiState.value.isSwitchingSession)
+        assertEquals(null, vm.uiState.value.switchedSessionId)
+        assertEquals("switch failed", vm.uiState.value.operationErrorMessage)
+    }
+
+    @Test
+    fun SidebarViewModel_clearSwitchedSessionRemovesSignal() = runTest(dispatcher) {
+        val updatedIds = mutableListOf<String>()
+        val vm = SidebarViewModel(
+            workspaceRepository = FakeWorkspaceRepository(
+                workspaces = listOf(workspace("proj-1", "/p")),
+                activeWorkspace = workspace("proj-1", "/p")
+            ),
+            sessionRepository = FakeSessionRepository(
+                updateCurrentSessionIdHandler = { id ->
+                    updatedIds.add(id)
+                    Result.success(Unit)
+                }
+            ),
+            appSettings = MockAppSettings()
+        )
+        advanceUntilIdle()
+
+        vm.switchSession("ses-target")
+        advanceUntilIdle()
+        assertEquals("ses-target", vm.uiState.value.switchedSessionId)
+
+        vm.clearSwitchedSession()
+
+        assertEquals(listOf("ses-target"), updatedIds)
+        assertEquals(null, vm.uiState.value.switchedSessionId)
     }
 
     @Test

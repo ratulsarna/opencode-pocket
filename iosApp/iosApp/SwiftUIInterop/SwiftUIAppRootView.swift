@@ -191,9 +191,17 @@ struct SwiftUIAppRootView: View {
         .onChange(of: sidebarUiState?.switchedWorkspaceId) { switchedWorkspaceId in
             guard let switchedWorkspaceId, !switchedWorkspaceId.isEmpty else { return }
             sidebarViewModel.clearCreatedSession()
+            sidebarViewModel.clearSwitchedSession()
             sidebarViewModel.clearWorkspaceSwitch()
             isSidebarPresented = false
             onRequestAppReset()
+        }
+        .onChange(of: sidebarUiState?.switchedSessionId) { switchedSessionId in
+            guard let switchedSessionId, !switchedSessionId.isEmpty else { return }
+            sidebarViewModel.clearSwitchedSession()
+            withAnimation(.snappy(duration: 0.28)) {
+                isSidebarPresented = false
+            }
         }
         .onChange(of: sidebarUiState?.createdSessionId) { createdSessionId in
             guard let createdSessionId, !createdSessionId.isEmpty else { return }

@@ -26,6 +26,7 @@ class SidebarViewModel(
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SidebarUiState())
+    private val loadingWorkspaceIds = mutableSetOf<String>()
     val uiState: StateFlow<SidebarUiState> = _uiState.asStateFlow()
 
     init {
@@ -110,7 +111,7 @@ class SidebarViewModel(
 
     fun loadSessionsForWorkspace(projectId: String) {
         val workspace = _uiState.value.workspaces.find { it.workspace.projectId == projectId } ?: return
-        if (workspace.isLoading) return
+        if (!loadingWorkspaceIds.add(projectId)) return
 
         // If sessions are already cached, show them immediately and refresh in background.
         // Only show loading indicator on first fetch (no cached sessions).
@@ -128,46 +129,74 @@ class SidebarViewModel(
         }
 
         viewModelScope.launch {
-            val start = Clock.System.now().toEpochMilliseconds() - DEFAULT_RECENT_WINDOW_MS
-            sessionRepository.getSessions(
-                search = null,
-                limit = null,
-                start = start,
-                directory = workspace.workspace.worktree
-            )
-                .onSuccess { allSessions ->
-                    val filtered = allSessions
-                        .filter { it.parentId == null && it.directory == workspace.workspace.worktree }
-                        .sortedByDescending { it.updatedAt }
-                    _uiState.update { state ->
-                        state.copy(workspaces = state.workspaces.map {
-                            if (it.workspace.projectId == projectId) {
-                                it.copy(sessions = filtered, isLoading = false, error = null)
-                            } else it
-                        })
+            try {
+                val start = Clock.System.now().toEpochMilliseconds() - DEFAULT_RECENT_WINDOW_MS
+                sessionRepository.getSessions(
+                    search = null,
+                    limit = null,
+                    start = start,
+                    directory = workspace.workspace.worktree
+                )
+                    .onSuccess { allSessions ->
+                        val filtered = allSessions
+                            .filter { it.parentId == null && it.directory == workspace.workspace.worktree }
+                            .sortedByDescending { it.updatedAt }
+                        _uiState.update { state ->
+                            state.copy(workspaces = state.workspaces.map {
+                                if (it.workspace.projectId == projectId) {
+                                    it.copy(sessions = filtered, isLoading = false, error = null)
+                                } else it
+                            })
+                        }
                     }
-                }
-                .onFailure { error ->
-                    OcMobileLog.w(TAG, "Failed to load sessions for $projectId: ${error.message}")
-                    _uiState.update { state ->
-                        state.copy(workspaces = state.workspaces.map {
-                            if (it.workspace.projectId == projectId) {
-                                it.copy(
-                                    isLoading = false,
-                                    error = error.message ?: "Failed to load sessions"
-                                )
-                            } else it
-                        })
+                    .onFailure { error ->
+                        OcMobileLog.w(TAG, "Failed to load sessions for $projectId: ${error.message}")
+                        _uiState.update { state ->
+                            state.copy(workspaces = state.workspaces.map {
+                                if (it.workspace.projectId == projectId) {
+                                    it.copy(
+                                        isLoading = false,
+                                        error = error.message ?: "Failed to load sessions"
+                                    )
+                                } else it
+                            })
+                        }
                     }
-                }
+            } finally {
+                loadingWorkspaceIds.remove(projectId)
+            }
         }
     }
 
     fun switchSession(sessionId: String) {
+        if (_uiState.value.isSwitchingSession) return
+
+        _uiState.update {
+            it.copy(
+                isSwitchingSession = true,
+                operationErrorMessage = null,
+                switchedSessionId = null
+            )
+        }
+
         viewModelScope.launch {
             sessionRepository.updateCurrentSessionId(sessionId)
+                .onSuccess {
+                    _uiState.update {
+                        it.copy(
+                            isSwitchingSession = false,
+                            switchedSessionId = sessionId
+                        )
+                    }
+                }
                 .onFailure { error ->
                     OcMobileLog.w(TAG, "Failed to switch session: ${error.message}")
+                    _uiState.update {
+                        it.copy(
+                            isSwitchingSession = false,
+                            operationErrorMessage = error.message ?: "Failed to switch session"
+                        )
+                    }
                 }
         }
     }
@@ -214,6 +243,10 @@ class SidebarViewModel(
 
     fun clearWorkspaceSwitch() {
         _uiState.update { it.copy(switchedWorkspaceId = null) }
+    }
+
+    fun clearSwitchedSession() {
+        _uiState.update { it.copy(switchedSessionId = null) }
     }
 
     fun clearOperationError() {
@@ -305,7 +338,9 @@ data class SidebarUiState(
     val isCreatingWorkspace: Boolean = false,
     val workspaceCreationError: String? = null,
     val operationErrorMessage: String? = null,
+    val isSwitchingSession: Boolean = false,
     val isSwitchingWorkspace: Boolean = false,
+    val switchedSessionId: String? = null,
     val switchedWorkspaceId: String? = null,
     val createdSessionId: String? = null
 )
