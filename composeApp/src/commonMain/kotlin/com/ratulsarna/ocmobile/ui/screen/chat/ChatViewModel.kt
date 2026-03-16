@@ -156,6 +156,8 @@ class ChatViewModel(
         )
     }
 
+    private fun normalizedSessionTitle(title: String?): String? = title?.takeIf(String::isNotBlank)
+
     /** Current selected agent (from persistent storage) */
     private var currentAgent: String? = null
 
@@ -1156,6 +1158,7 @@ class ChatViewModel(
                         _uiState.update {
                             it.copy(
                                 currentSessionId = null,
+                                currentSessionTitle = null,
                                 revertMessageId = null,
                                 messages = emptyList(),
                                 lastGoodMessageId = null,
@@ -1176,6 +1179,7 @@ class ChatViewModel(
                     _uiState.update {
                         it.copy(
                             currentSessionId = newSessionId,
+                            currentSessionTitle = null,
                             revertMessageId = null,
                             messages = emptyList(),
                             lastGoodMessageId = null,
@@ -1190,7 +1194,11 @@ class ChatViewModel(
                     val session = sessionRepository.getSession(newSessionId).getOrNull()
                     if (newSessionId == _uiState.value.currentSessionId) {
                         val revertMessageId = session?.revert?.messageId
-                        _uiState.update { state -> applyRevertPointer(state, revertMessageId) }
+                        _uiState.update { state ->
+                            applyRevertPointer(state, revertMessageId).copy(
+                                currentSessionTitle = normalizedSessionTitle(session?.title)
+                            )
+                        }
                         viewModelScope.launch {
                             contextUsageRepository.updateUsage(_uiState.value.messages)
                         }
@@ -1233,7 +1241,13 @@ class ChatViewModel(
                 }
 
             OcMobileLog.d(TAG, "loadCurrentSession: REST returned sessionId=$sessionId")
-            _uiState.update { it.copy(currentSessionId = sessionId, revertMessageId = null) }
+            _uiState.update {
+                it.copy(
+                    currentSessionId = sessionId,
+                    currentSessionTitle = null,
+                    revertMessageId = null
+                )
+            }
             refreshPendingPermissions()
 
             // Resolve revert pointer before loading messages to avoid transiently rendering hidden messages,
@@ -1241,7 +1255,11 @@ class ChatViewModel(
             val session = sessionRepository.getSession(sessionId).getOrNull()
             if (sessionId == _uiState.value.currentSessionId) {
                 val revertMessageId = session?.revert?.messageId
-                _uiState.update { state -> applyRevertPointer(state, revertMessageId) }
+                _uiState.update { state ->
+                    applyRevertPointer(state, revertMessageId).copy(
+                        currentSessionTitle = normalizedSessionTitle(session?.title)
+                    )
+                }
                 viewModelScope.launch {
                     contextUsageRepository.updateUsage(_uiState.value.messages)
                 }
@@ -1767,7 +1785,11 @@ class ChatViewModel(
 
         val revertMessageId = event.session.revert?.messageId
         val previousRevertMessageId = _uiState.value.revertMessageId
-        _uiState.update { state -> applyRevertPointer(state, revertMessageId) }
+        _uiState.update { state ->
+            applyRevertPointer(state, revertMessageId).copy(
+                currentSessionTitle = normalizedSessionTitle(event.session.title)
+            )
+        }
         viewModelScope.launch {
             contextUsageRepository.updateUsage(_uiState.value.messages)
         }
@@ -2102,6 +2124,7 @@ class ChatViewModel(
                             lastGoodMessageId = if (response.error == null) response.id else it.lastGoodMessageId,
                             // Update local state to actual session (handles session cycling)
                             currentSessionId = response.sessionId,
+                            currentSessionTitle = if (response.sessionId == it.currentSessionId) it.currentSessionTitle else null,
                             // After the user resumes, OpenCode cleans up reverted messages and clears the pointer.
                             revertMessageId = null
                         )
@@ -2399,6 +2422,7 @@ class ChatViewModel(
                     _uiState.update {
                         it.copy(
                             currentSessionId = newSession.id,
+                            currentSessionTitle = normalizedSessionTitle(newSession.title),
                             revertMessageId = null,
                             messages = emptyList(),
                             lastGoodMessageId = null,
@@ -2576,6 +2600,7 @@ class ChatViewModel(
             _uiState.update {
                 it.copy(
                     currentSessionId = sessionId,
+                    currentSessionTitle = null,
                     revertMessageId = null,
                     messages = emptyList(), // Clear while loading
                     isLoading = true,
@@ -2589,7 +2614,11 @@ class ChatViewModel(
             val session = sessionRepository.getSession(sessionId).getOrNull()
             if (sessionId == _uiState.value.currentSessionId) {
                 val revertMessageId = session?.revert?.messageId
-                _uiState.update { state -> applyRevertPointer(state, revertMessageId) }
+                _uiState.update { state ->
+                    applyRevertPointer(state, revertMessageId).copy(
+                        currentSessionTitle = normalizedSessionTitle(session?.title)
+                    )
+                }
                 viewModelScope.launch {
                     contextUsageRepository.updateUsage(_uiState.value.messages)
                 }

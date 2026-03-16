@@ -117,7 +117,7 @@ struct SwiftUIChatUIKitView: View {
             onOpenSettings: onOpenSettings,
             onDismissError: viewModel.dismissError,
             onRevert: viewModel.revertToLastGood,
-            sessionTitle: sessionTitle,
+            sessionTitle: state.currentSessionTitle ?? sessionTitle,
             workspacePath: workspacePath
         )
         .padding(.horizontal, 12)

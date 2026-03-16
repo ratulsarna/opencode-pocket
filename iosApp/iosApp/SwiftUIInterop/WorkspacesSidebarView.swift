@@ -134,7 +134,7 @@ struct WorkspacesSidebarView: View {
                             viewModel.createSession(workspaceProjectId: projectId)
                         }
                     )
-                    .disabled(state.isSwitchingWorkspace || state.isSwitchingSession)
+                    .disabled(state.isSwitchingWorkspace || state.isSwitchingSession || state.isCreatingSession)
                 }
             }
             .padding(.horizontal, 12)
