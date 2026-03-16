@@ -96,8 +96,13 @@ class OpenCodeApiImpl(
         return httpClient.get("$baseUrl/session/$sessionId").body()
     }
 
-    override suspend fun getSessions(search: String?, limit: Int?, start: Long?): List<SessionDto> {
+    override suspend fun getSessions(search: String?, limit: Int?, start: Long?, directory: String?): List<SessionDto> {
         return httpClient.get("$baseUrl/session") {
+            val dir = directory?.trim()?.takeIf { it.isNotBlank() }
+            if (dir != null) {
+                headers.remove("x-opencode-directory")
+                header("x-opencode-directory", dir)
+            }
             if (start != null) parameter("start", start)
             if (!search.isNullOrBlank()) parameter("search", search)
             if (limit != null) parameter("limit", limit)

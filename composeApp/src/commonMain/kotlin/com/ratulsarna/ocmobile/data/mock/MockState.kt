@@ -329,8 +329,12 @@ class MockState {
         sessions[id]
     }
 
-    suspend fun getSessions(search: String?, limit: Int?, start: Long?): List<SessionDto> = mutex.withLock {
+    suspend fun getSessions(search: String?, limit: Int?, start: Long?, directory: String?): List<SessionDto> = mutex.withLock {
         val filtered = sessions.values.asSequence()
+            .filter { dto ->
+                if (directory.isNullOrBlank()) return@filter true
+                dto.directory == directory
+            }
             .filter { dto ->
                 if (start == null) return@filter true
                 dto.time.updated >= start

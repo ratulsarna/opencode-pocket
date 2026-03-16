@@ -12,9 +12,8 @@ import com.ratulsarna.ocmobile.ui.screen.chat.ChatViewModel
 import com.ratulsarna.ocmobile.ui.screen.connect.ConnectViewModel
 import com.ratulsarna.ocmobile.ui.screen.docs.MarkdownFileViewerViewModel
 import com.ratulsarna.ocmobile.ui.screen.filebrowser.FileBrowserViewModel
-import com.ratulsarna.ocmobile.ui.screen.sessions.SessionsViewModel
 import com.ratulsarna.ocmobile.ui.screen.settings.SettingsViewModel
-import com.ratulsarna.ocmobile.ui.screen.workspaces.WorkspacesViewModel
+import com.ratulsarna.ocmobile.ui.screen.sidebar.SidebarViewModel
 
 /**
  * iOS-facing ViewModel owners for SwiftUI.
@@ -44,8 +43,8 @@ class IosAppViewModelOwner : ViewModelStoreOwner {
     /** Matches Compose `viewModel(key = "settings") { AppModule.createSettingsViewModel() }` */
     fun settingsViewModel(): SettingsViewModel = get(key = "settings") { AppModule.createSettingsViewModel() }
 
-    /** Matches Compose `viewModel(key = "workspaces") { AppModule.createWorkspacesViewModel() }` */
-    fun workspacesViewModel(): WorkspacesViewModel = get(key = "workspaces") { AppModule.createWorkspacesViewModel() }
+    /** App-scoped sidebar combining workspaces + sessions. */
+    fun sidebarViewModel(): SidebarViewModel = get(key = "sidebar") { AppModule.createSidebarViewModel() }
 
     /** App-scoped: used for onboarding/pairing flow. */
     fun connectViewModel(): ConnectViewModel = get(key = "connect") { AppModule.createConnectViewModel() }
@@ -85,8 +84,6 @@ class IosScreenViewModelOwner : ViewModelStoreOwner {
     fun clear() {
         viewModelStore.clear()
     }
-
-    fun sessionsViewModel(): SessionsViewModel = get(key = "sessions") { AppModule.createSessionsViewModel() }
 
     /** Matches Compose `viewModel(key = "markdown-$path-$openId") { AppModule.createMarkdownFileViewerViewModel(path) }` */
     fun markdownFileViewerViewModel(path: String, openId: Long): MarkdownFileViewerViewModel =

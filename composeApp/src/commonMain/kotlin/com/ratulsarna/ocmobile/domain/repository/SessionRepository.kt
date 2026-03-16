@@ -23,7 +23,8 @@ interface SessionRepository {
     suspend fun getSessions(
         search: String? = null,
         limit: Int? = null,
-        start: Long? = null
+        start: Long? = null,
+        directory: String? = null
     ): Result<List<Session>>
 
     /**

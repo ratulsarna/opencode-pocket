@@ -64,3 +64,6 @@ companion/oc-pocket/bin/
 
 # oc-pocket release/build artifacts
 companion/oc-pocket/dist/
+
+# Git worktrees
+.worktrees/

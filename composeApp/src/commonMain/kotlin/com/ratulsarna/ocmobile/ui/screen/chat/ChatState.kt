@@ -14,6 +14,7 @@ import com.ratulsarna.ocmobile.domain.model.VaultEntry
  */
 data class ChatUiState(
     val currentSessionId: String? = null,
+    val currentSessionTitle: String? = null,
     /** If set, the session is in "reverted" state and messages after this point should be hidden. */
     val revertMessageId: String? = null,
     val messages: List<Message> = emptyList(),

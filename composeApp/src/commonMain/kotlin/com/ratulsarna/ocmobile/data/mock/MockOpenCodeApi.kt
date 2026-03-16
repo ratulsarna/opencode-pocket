@@ -137,8 +137,8 @@ class MockOpenCodeApi(
     override suspend fun getSession(sessionId: String): SessionDto =
         state.getSession(sessionId) ?: throw RuntimeException("Session not found: $sessionId")
 
-    override suspend fun getSessions(search: String?, limit: Int?, start: Long?): List<SessionDto> =
-        state.getSessions(search = search, limit = limit, start = start)
+    override suspend fun getSessions(search: String?, limit: Int?, start: Long?, directory: String?): List<SessionDto> =
+        state.getSessions(search = search, limit = limit, start = start, directory = directory)
 
     override suspend fun createSession(request: CreateSessionRequest): SessionDto {
         return state.createSession(
